@@ -6,9 +6,10 @@ import pkg from "@prisma/client";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 
+
 const { PrismaClient } = pkg;
 
-const dbUrl = process.env.DATABASE_URL;
+const dbUrl = (process.env.DATABASE_URL || "").trim().replace(/^"|"$/g, "");
 const caPath = process.env.DB_SSL_CA_PATH;
 
 if (!dbUrl) throw new Error("DATABASE_URL missing in .env");
@@ -18,10 +19,13 @@ const host = new URL(dbUrl).hostname;
 
 const pool = new Pool({
   connectionString: dbUrl,
+  //  Esto fuerza que todo vaya al schema leofy (en vez de public)
+  options: "-c search_path=leofy",
+  //  TLS con CA (Aiven)
   ssl: {
     ca: fs.readFileSync(caPath, "utf8"),
     rejectUnauthorized: true,
-    servername: host, // 👈 ayuda a verify-full (SNI)
+    servername: host,
   },
 });
 

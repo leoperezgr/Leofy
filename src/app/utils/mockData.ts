@@ -26,21 +26,23 @@ export interface Category {
 
 export const categories: Category[] = [
   // Income categories
-  { name: 'Salary', icon: 'Briefcase', type: 'income' },
-  { name: 'Freelance', icon: 'Laptop', type: 'income' },
-  { name: 'Investment', icon: 'TrendingUp', type: 'income' },
+  { name: 'Allowance', icon: 'Wallet', type: 'income' },
+  { name: 'Transfers', icon: 'ArrowDownCircle', type: 'income' },
+  { name: 'Pending Income', icon: 'Clock', type: 'income' },
+  { name: 'Investments', icon: 'TrendingUp', type: 'income' },
   { name: 'Other Income', icon: 'Plus', type: 'income' },
   
   // Expense categories
-  { name: 'Food & Dining', icon: 'UtensilsCrossed', type: 'expense' },
+  { name: 'Groceries', icon: 'ShoppingCart', type: 'expense' },
+  { name: 'Dining & Coffee', icon: 'UtensilsCrossed', type: 'expense' },
+  { name: 'Convenience', icon: 'Store', type: 'expense' },
+  { name: 'Transport & Gas', icon: 'Car', type: 'expense' },
   { name: 'Shopping', icon: 'ShoppingBag', type: 'expense' },
-  { name: 'Transport', icon: 'Car', type: 'expense' },
+  { name: 'Personal Care', icon: 'Heart', type: 'expense' },
   { name: 'Entertainment', icon: 'Film', type: 'expense' },
-  { name: 'Health', icon: 'Heart', type: 'expense' },
-  { name: 'Bills', icon: 'Receipt', type: 'expense' },
-  { name: 'Education', icon: 'GraduationCap', type: 'expense' },
+  { name: 'Subscriptions', icon: 'Laptop', type: 'expense' },
   { name: 'Other', icon: 'MoreHorizontal', type: 'expense' },
-];
+  ];
 
 export const creditCards: CreditCard[] = [
   {

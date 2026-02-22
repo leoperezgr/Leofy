@@ -10,6 +10,11 @@ import { transactionsRouter } from "./routes/transactions.routes.js";
 import { cardsRouter } from "./routes/cards.routes.js";
 import { statsRouter } from "./routes/stats.routes.js";
 
+// ✅ BigInt -> string en JSON
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
+
 const app = express();
 
 app.use(helmet());
