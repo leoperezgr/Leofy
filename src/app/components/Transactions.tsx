@@ -1,37 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { getCategoryIcon } from '../utils/mockData';
+import { UiTransaction, normalizeTransactions } from '../utils/transactionsMapper';
 import * as LucideIcons from 'lucide-react';
 
+
 type FilterType = 'all' | 'income' | 'expense';
-
-type ApiTransaction = {
-  id: string | number;
-  type: 'INCOME' | 'EXPENSE' | 'income' | 'expense';
-  amount: number | string;
-  description?: string | null;
-
-  occurred_at?: string;
-  created_at?: string;
-  date?: string;
-
-  category?: string | null;
-  category_id?: string | number | null;
-
-  metadata?: {
-    category_name?: string;
-    [key: string]: any;
-  } | null;
-};
-type UiTransaction = {
-  id: string;
-  type: 'income' | 'expense';
-  amount: number;
-  category: string;
-  description: string;
-  date: string; // YYYY-MM-DD
-  paymentMethod: string; // backend no lo tiene aún
-};
 
 export function Transactions() {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
@@ -67,45 +41,10 @@ export function Transactions() {
           throw new Error(msg);
         }
 
-        // ✅ soporta [] y { transactions: [] }
-        const arr: ApiTransaction[] = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.transactions)
-            ? data.transactions
-            : [];
-
-        const normalized: UiTransaction[] = arr
-          .filter(Boolean)
-          .map((t) => {
-            // ✅ usa occurred_at (tu schema) y cae a created_at/date si hace falta
-            const iso = t.occurred_at || t.created_at || t.date || new Date().toISOString();
-            const dateOnly = new Date(iso).toISOString().split('T')[0];
-
-            // ✅ enum real INCOME/EXPENSE -> UI income/expense
-            const rawType = String(t.type || '').toUpperCase();
-            const uiType: 'income' | 'expense' = rawType === 'INCOME' ? 'income' : 'expense';
-
-            const amountNum = Number(t.amount);
-            const safeAmount = Number.isFinite(amountNum) ? amountNum : 0;
-
-            // ✅ si no hay nombre de categoría aún, muestra algo en lugar de vacío
-            const categoryLabel =
-              (t.category && String(t.category)) ||
-              (t.metadata?.category_name && String(t.metadata.category_name)) || // ✅ AQUI
-              (t.category_id != null ? `Category #${t.category_id}` : 'Uncategorized');
-
-            return {
-              id: String(t.id),
-              type: uiType,
-              amount: safeAmount,
-              category: categoryLabel,
-              description: t.description ?? '',
-              date: dateOnly,
-              paymentMethod: 'cash',
-            };
-          });
-
+      const normalized: UiTransaction[] = normalizeTransactions(data);
         if (!cancelled) setItems(normalized);
+
+        
       } catch (e) {
         console.error('LOAD TRANSACTIONS ERROR:', e);
         if (!cancelled) setItems([]);
