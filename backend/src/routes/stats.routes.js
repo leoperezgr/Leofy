@@ -28,7 +28,7 @@ statsRouter.get("/summary", async (req, res) => {
 
 // GET /api/stats/dashboard?userId=2
 statsRouter.get("/dashboard", async (req, res) => {
-  const userId = BigInt(req.query.userId || 2);
+  const userId = BigInt(req.user.id);
 
   const [incomeAgg, expenseAgg] = await Promise.all([
     prisma.transaction.aggregate({
@@ -56,6 +56,7 @@ statsRouter.get("/dashboard", async (req, res) => {
       description: true,
       occurred_at: true,
       category_id: true,
+      metadata: true,
     },
   });
 

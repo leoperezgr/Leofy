@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, ArrowDownRight, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { UiTransaction, normalizeTransactions } from '../utils/transactionsMapper';
 import { BarChart, Bar, XAxis, ResponsiveContainer } from 'recharts';
 
 type DashboardData = {
@@ -28,6 +29,7 @@ export function Dashboard() {
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recentUi, setRecentUi] = useState<UiTransaction[]>([]);
 
   useEffect(() => {
   let cancelled = false;
@@ -67,12 +69,15 @@ export function Dashboard() {
       }
 
       if (!cancelled) setData(json);
+      const uiRecent = normalizeTransactions({ recentTransactions: json?.recentTransactions || [] }).slice(0, 5);
+        if (!cancelled) setRecentUi(uiRecent);
     } catch (e) {
       console.error('LOAD DASHBOARD ERROR:', e);
       if (!cancelled) setData(null);
     } finally {
       if (!cancelled) setLoading(false);
     }
+    
   }
 
   load();
@@ -245,15 +250,15 @@ export function Dashboard() {
           </Link>
         </div>
         <div className="space-y-3">
-          {recentTransactions.map((t) => (
+          {recentUi.map((t) => (
             <div key={t.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
               <div className="flex items-center gap-3">
                 <div
                   className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    t.type === 'INCOME' ? 'bg-green-50' : 'bg-red-50'
+                    t.type === 'income' ? 'bg-green-50' : 'bg-red-50'
                   }`}
                 >
-                  {t.type === 'INCOME' ? (
+                  {t.type === 'income' ? (
                     <ArrowUpRight className="w-5 h-5 text-green-600" />
                   ) : (
                     <ArrowDownRight className="w-5 h-5 text-red-600" />
@@ -262,16 +267,16 @@ export function Dashboard() {
                 <div>
                   <p className="font-medium text-[#1F2933]">{t.description ?? '—'}</p>
                   <p className="text-sm text-[#64748B]">
-                    {t.category_id ? `Category #${t.category_id}` : 'Uncategorized'}
+                    {t.category || 'Uncategorized'}
                   </p>
                 </div>
               </div>
               <span
                 className={`font-semibold ${
-                  t.type === 'INCOME' ? 'text-green-600' : 'text-[#1F2933]'
+                  t.type === 'income' ? 'text-green-600' : 'text-[#1F2933]'
                 }`}
               >
-                {t.type === 'INCOME' ? '+' : '-'}${Number(t.amount).toFixed(2)}
+                {t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)}
               </span>
             </div>
           ))}
