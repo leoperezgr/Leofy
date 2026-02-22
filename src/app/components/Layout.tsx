@@ -1,11 +1,42 @@
-import { Outlet, Link, useLocation } from 'react-router';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Receipt, CreditCard, BarChart3, Settings, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AddTransactionModal } from './AddTransactionModal';
 
 export function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [showAddTransaction, setShowAddTransaction] = useState(false);
+
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkServer() {
+      try {
+        const res = await fetch(`${API_BASE}/health`, { cache: 'no-store' });
+        if (!res.ok) throw new Error('Health not ok');
+      } catch {
+        if (cancelled) return;
+
+        // backend caído -> limpiamos sesión local y mandamos a login
+        localStorage.removeItem('leofy_token');
+        localStorage.removeItem('leofy_user');
+        localStorage.removeItem('leofy_onboarded');
+
+        navigate('/login', { replace: true });
+      }
+    }
+
+    checkServer(); // al cargar
+    const interval = setInterval(checkServer, 10000); // cada 10s
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [API_BASE, navigate]);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -48,17 +79,18 @@ export function Layout() {
               </Link>
             );
           })}
-        </nav>
 
-        <div className="p-4">
+          {/* Add Transaction Button debajo de los nav items */}
           <button
             onClick={() => setShowAddTransaction(true)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#2DD4BF] text-white rounded-xl hover:bg-[#14B8A6] transition-colors"
+            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#2DD4BF] text-white rounded-xl hover:bg-[#14B8A6] transition-colors"
           >
             <Plus className="w-5 h-5" />
             <span className="font-medium">Add Transaction</span>
           </button>
-        </div>
+        </nav>
+
+        
       </aside>
 
       {/* Main Content */}
@@ -98,9 +130,9 @@ export function Layout() {
       </button>
 
       {/* Add Transaction Modal */}
-      <AddTransactionModal 
-        open={showAddTransaction} 
-        onClose={() => setShowAddTransaction(false)} 
+      <AddTransactionModal
+        open={showAddTransaction}
+        onClose={() => setShowAddTransaction(false)}
       />
     </div>
   );

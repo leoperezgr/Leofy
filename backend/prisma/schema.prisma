@@ -4,47 +4,99 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["leofy"]
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  passwordHash  String
-  name          String?
-  onboarded     Boolean  @default(false)
+  id             BigInt    @id @default(autoincrement())
+  full_name      String
+  email          String    @unique
+  password_hash  String
+  email_verified Boolean   @default(false)
+  is_active      Boolean   @default(true)
+  last_login_at  DateTime? @db.Timestamptz(6)
+  created_at     DateTime  @default(now()) @db.Timestamptz(6)
 
-  transactions  Transaction[]
-  cards         CreditCard[]
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  @@map("users")
+  @@schema("leofy")
 }
 
 model Transaction {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  type        String   // "income" | "expense"
-  amount      Decimal  @db.Decimal(12,2)
-  category    String
+  id          BigInt           @id @default(autoincrement())
+  user_id     BigInt
+  type        transaction_type
+  amount      Decimal          @db.Decimal(12, 2)
   description String?
-  date        DateTime
+  occurred_at DateTime         @default(now()) @db.Timestamptz(6)
+  card_id     BigInt?
+  category_id BigInt?
+  metadata    Json             @default("{}")
+  created_at  DateTime         @default(now()) @db.Timestamptz(6)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  @@index([metadata], map: "idx_transactions_metadata", type: Gin)
+  @@index([user_id, card_id], map: "idx_transactions_user_card")
+  @@index([user_id, category_id], map: "idx_transactions_user_category")
+  @@index([user_id, occurred_at(sort: Desc)], map: "idx_transactions_user_date")
+  @@map("transactions")
+  @@schema("leofy")
 }
 
 model CreditCard {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           BigInt     @id @default(autoincrement())
+  user_id      BigInt
+  name         String
+  brand        card_brand @default(OTHER)
+  last4        String?    @db.Char(4)
+  credit_limit Decimal?   @db.Decimal(12, 2)
+  closing_day  Int?       @db.SmallInt
+  due_day      Int?       @db.SmallInt
+  created_at   DateTime   @default(now()) @db.Timestamptz(6)
 
-  name        String
-  last4       String
-  brand       String?
-  limit       Decimal? @db.Decimal(12,2)
+  @@unique([user_id, name])
+  @@index([user_id], map: "idx_cards_user")
+  @@map("cards")
+  @@schema("leofy")
+}
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model categories {
+  id         BigInt           @id @default(autoincrement())
+  user_id    BigInt
+  name       String
+  type       transaction_type
+  created_at DateTime         @default(now()) @db.Timestamptz(6)
+
+  @@unique([user_id, type, name])
+  @@index([user_id], map: "idx_categories_user")
+  @@schema("leofy")
+}
+
+model sessions {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt
+  token_hash String    @unique
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  expires_at DateTime  @db.Timestamptz(6)
+  revoked_at DateTime? @db.Timestamptz(6)
+  user_agent String?
+  ip_address String?
+
+  @@index([expires_at], map: "idx_sessions_expires")
+  @@index([user_id], map: "idx_sessions_user")
+  @@schema("leofy")
+}
+
+enum card_brand {
+  VISA
+  MASTERCARD
+  AMEX
+  OTHER
+
+  @@schema("leofy")
+}
+
+enum transaction_type {
+  INCOME
+  EXPENSE
+
+  @@schema("leofy")
 }

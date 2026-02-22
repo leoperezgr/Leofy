@@ -7,7 +7,16 @@ export function requireAuth(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { id: payload.sub, email: payload.email };
+
+    // ✅ Tu JWT usa userId (NO sub)
+    const userId = payload.userId || payload.sub;
+    if (!userId) return res.status(401).json({ error: "Invalid token payload" });
+
+    req.user = {
+      id: userId,              // string
+      email: payload.email,    // opcional
+    };
+
     next();
   } catch {
     return res.status(401).json({ error: "Invalid token" });

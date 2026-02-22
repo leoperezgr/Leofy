@@ -1,22 +1,39 @@
-import { createBrowserRouter, redirect } from 'react-router';
-import { Layout } from './components/Layout';
-import { Onboarding } from './components/Onboarding';
-import { Login } from './components/Login';
-import { Dashboard } from './components/Dashboard';
-import { Transactions } from './components/Transactions';
-import { CreditCards } from './components/CreditCards';
-import { CardDetail } from './components/CardDetail';
-import { Statistics } from './components/Statistics';
-import { Settings } from './components/Settings';
+import { createBrowserRouter, redirect } from "react-router-dom";
+import { Layout } from "./components/Layout";
+import { Onboarding } from "./components/Onboarding";
+import { Login } from "./components/Login";
+import { Dashboard } from "./components/Dashboard";
+import { Transactions } from "./components/Transactions";
+import { CreditCards } from "./components/CreditCards";
+import { CardDetail } from "./components/CardDetail";
+import { Statistics } from "./components/Statistics";
+import { Settings } from "./components/Settings";
 
-// Check if user has completed onboarding
-
-const hasOnboarded = () => localStorage.getItem("leofy_onboarded") === "false";
-const isLoggedIn = () => !!localStorage.getItem("leofy_token"); // o lo que uses
+// ✅ Flags reales
+const hasOnboarded = () => localStorage.getItem("leofy_onboarded") === "true";
+const isLoggedIn = () => Boolean(localStorage.getItem("leofy_token"));
 
 export const router = createBrowserRouter([
-  { path: "/login", Component: Login },
-  { path: "/onboarding", Component: Onboarding },
+  {
+    path: "/login",
+    Component: Login,
+    loader: () => {
+      // Si ya está logueado, no debería ver login
+      if (isLoggedIn()) return redirect("/");
+      return null;
+    },
+  },
+  {
+    path: "/onboarding",
+    Component: Onboarding,
+    loader: () => {
+      // Si no está logueado, no debería onboardear
+      if (!isLoggedIn()) return redirect("/login");
+      // Si ya onboardeó, no debería ver onboarding
+      if (hasOnboarded()) return redirect("/");
+      return null;
+    },
+  },
 
   {
     path: "/",
