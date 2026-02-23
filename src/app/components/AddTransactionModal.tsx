@@ -96,12 +96,12 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
         // Nota: backend NO guarda paymentMethod/cardId hoy; si lo mandas, Zod lo strippea.
       };
 
+      const headers = authHeaders();
+      headers.set("Content-Type", "application/json");
+
       const res = await fetch(`${API_BASE}/api/transactions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders(),
-        },
+        method: "POST",
+        headers, 
         body: JSON.stringify(payload),
       });
 
