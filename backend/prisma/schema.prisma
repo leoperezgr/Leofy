@@ -32,11 +32,13 @@ model Transaction {
   category_id BigInt?
   metadata    Json             @default("{}")
   created_at  DateTime         @default(now()) @db.Timestamptz(6)
+  transfer_id String?          @db.Uuid
 
   @@index([metadata], map: "idx_transactions_metadata", type: Gin)
   @@index([user_id, card_id], map: "idx_transactions_user_card")
   @@index([user_id, category_id], map: "idx_transactions_user_category")
   @@index([user_id, occurred_at(sort: Desc)], map: "idx_transactions_user_date")
+  @@index([transfer_id], map: "idx_transactions_transfer_id")
   @@map("transactions")
   @@schema("leofy")
 }
@@ -51,6 +53,7 @@ model CreditCard {
   closing_day  Int?       @db.SmallInt
   due_day      Int?       @db.SmallInt
   created_at   DateTime   @default(now()) @db.Timestamptz(6)
+  color        card_color @default(OTHER)
 
   @@unique([user_id, name])
   @@index([user_id], map: "idx_cards_user")
@@ -97,6 +100,21 @@ enum card_brand {
 enum transaction_type {
   INCOME
   EXPENSE
+
+  @@schema("leofy")
+}
+
+enum card_color {
+  RED
+  ORANGE
+  BLUE
+  GOLD
+  BLACK
+  PLATINUM
+  PURPLE
+  GREEN
+  SILVER
+  OTHER
 
   @@schema("leofy")
 }

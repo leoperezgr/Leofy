@@ -19,11 +19,12 @@ type Card = {
 export function AddTransactionModal({ open, onClose }: AddTransactionModalProps) {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
-  const [type, setType] = useState<'income' | 'expense'>('expense');
+  const [type, setType] = useState<'income' | 'expense' | 'transfer'>('expense');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'debit' | 'credit'>('cash');
-  const [cardId, setCardId] = useState('');
+  const [cardId, setCardId] = useState(''); // credit card selection OR transfer fromCardId
+  const [toCardId, setToCardId] = useState(''); // transfer toCardId
   const [description, setDescription] = useState('');
   const [customCategory, setCustomCategory] = useState('');
 
@@ -31,8 +32,36 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
   const [cardsLoading, setCardsLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
 
-  const filteredCategories = categories.filter((cat) => cat.type === type);
+  const filteredCategories = categories.filter((cat) =>
+    cat.type === (type === 'transfer' ? 'expense' : type)
+  );
 
+  // --- Amount formatter (commas + up to 2 decimals) ---
+  const formatAmount = (value: string) => {
+    if (!value) return '';
+
+    const cleaned = value.replace(/,/g, '');
+    if (!cleaned) return '';
+
+    const [integer, decimal] = cleaned.split('.');
+
+    const formattedInteger = new Intl.NumberFormat('en-US').format(Number(integer || 0));
+
+    if (decimal !== undefined) return `${formattedInteger}.${decimal}`;
+    return formattedInteger;
+  };
+
+  const handleAmountChange = (value: string) => {
+    let cleaned = value.replace(/[^\d.]/g, '');
+
+    const parts = cleaned.split('.');
+    if (parts.length > 2) return;
+
+    if (parts[1]?.length > 2) parts[1] = parts[1].slice(0, 2);
+
+    cleaned = parts.join('.');
+    setAmount(cleaned);
+  };
 
   const authHeaders = (): Headers => {
     const token = localStorage.getItem('leofy_token');
@@ -41,7 +70,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
     return h;
   };
 
-  // 🔥 Cargar tarjetas desde backend cuando se abre el modal
+  // Load cards when modal opens (used for credit selection and transfer accounts)
   useEffect(() => {
     if (!open) return;
 
@@ -66,12 +95,6 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const finalCategory = category === 'Other' ? customCategory.trim() : category;
-    if (!finalCategory) {
-      alert('Please enter a category');
-      return;
-    }
-
     const desc = description.trim();
     if (!desc) {
       alert('Please enter a description');
@@ -87,21 +110,74 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
     try {
       setSubmitLoading(true);
 
+      const headers = authHeaders();
+      headers.set('Content-Type', 'application/json');
+
+      // ✅ TRANSFER
+      if (type === 'transfer') {
+        if (!cardId) {
+          alert('Please select FROM account');
+          return;
+        }
+        if (!toCardId) {
+          alert('Please select TO account');
+          return;
+        }
+        if (cardId === toCardId) {
+          alert('FROM and TO accounts must be different');
+          return;
+        }
+
+        const transferPayload = {
+          fromCardId: cardId,
+          toCardId,
+          amount: amountNum,
+          description: desc,
+          date: new Date().toISOString(),
+        };
+
+        const res = await fetch(`${API_BASE}/api/transfers`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(transferPayload),
+        });
+
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to create transfer');
+
+        onClose();
+        setTimeout(() => window.location.reload(), 50);
+
+        // Reset
+        setAmount('');
+        setCategory('');
+        setCustomCategory('');
+        setDescription('');
+        setPaymentMethod('cash');
+        setCardId('');
+        setToCardId('');
+        return;
+      }
+
+      // ✅ NORMAL TRANSACTION (income/expense)
+      const finalCategory = category === 'Other' ? customCategory.trim() : category;
+      if (!finalCategory) {
+        alert('Please enter a category');
+        return;
+      }
+
       const payload = {
         type, // "income" | "expense"
         amount: amountNum,
         category: finalCategory,
-        description: desc, // ✅ obligatorio
+        description: desc,
         date: new Date().toISOString(),
-        // Nota: backend NO guarda paymentMethod/cardId hoy; si lo mandas, Zod lo strippea.
+        // Note: backend might strip paymentMethod/cardId today depending on Zod schema
       };
 
-      const headers = authHeaders();
-      headers.set("Content-Type", "application/json");
-
       const res = await fetch(`${API_BASE}/api/transactions`, {
-        method: "POST",
-        headers, 
+        method: 'POST',
+        headers,
         body: JSON.stringify(payload),
       });
 
@@ -111,13 +187,14 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
       onClose();
       setTimeout(() => window.location.reload(), 50);
 
-      // Reset form
+      // Reset
       setAmount('');
       setCategory('');
       setCustomCategory('');
       setDescription('');
       setPaymentMethod('cash');
       setCardId('');
+      setToCardId('');
     } catch (err: any) {
       alert(err?.message || 'Error creating transaction');
     } finally {
@@ -133,10 +210,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
@@ -158,7 +232,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Type Toggle */}
-          <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-xl">
+          <div className="grid grid-cols-3 gap-2 p-1 bg-gray-100 rounded-xl">
             <button
               type="button"
               onClick={() => setType('expense')}
@@ -177,6 +251,15 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
             >
               Income
             </button>
+            <button
+              type="button"
+              onClick={() => setType('transfer')}
+              className={`py-3 rounded-lg font-medium transition-colors ${
+                type === 'transfer' ? 'bg-white text-[#1F2933] shadow-sm' : 'text-[#64748B]'
+              }`}
+            >
+              Transfer
+            </button>
           </div>
 
           {/* Amount */}
@@ -187,10 +270,10 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
                 $
               </span>
               <input
-                type="number"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                type="text"
+                inputMode="decimal"
+                value={formatAmount(amount)}
+                onChange={(e) => handleAmountChange(e.target.value)}
                 placeholder="0.00"
                 required
                 className="w-full pl-10 pr-4 py-4 text-2xl font-semibold bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
@@ -198,36 +281,91 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
             </div>
           </div>
 
-          {/* Category */}
-          <div>
-            <label className="block text-sm font-medium text-[#64748B] mb-3">Category</label>
-            <div className="grid grid-cols-4 gap-2">
-              {filteredCategories.map((cat) => {
-                const IconComponent = getIconComponent(cat.icon);
-                return (
-                  <button
-                    key={cat.name}
-                    type="button"
-                    onClick={() => setCategory(cat.name)}
-                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
-                      category === cat.name
-                        ? 'border-[#2DD4BF] bg-[#2DD4BF]/5'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <IconComponent className="w-6 h-6 text-[#64748B]" />
-                    <span className="text-xs text-center line-clamp-1">{cat.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {/* Transfer accounts */}
+          {type === 'transfer' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#64748B] mb-2">
+                  From (Debit Account)
+                </label>
 
-          {category === 'Other' && (
+                {cardsLoading ? (
+                  <div className="text-sm text-[#64748B]">Loading accounts…</div>
+                ) : (
+                  <select
+                    value={cardId}
+                    onChange={(e) => setCardId(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
+                  >
+                    <option value="">Select account</option>
+                    {cards.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} •••• {c.last4}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#64748B] mb-2">
+                  To (Debit Account)
+                </label>
+
+                {cardsLoading ? (
+                  <div className="text-sm text-[#64748B]">Loading accounts…</div>
+                ) : (
+                  <select
+                    value={toCardId}
+                    onChange={(e) => setToCardId(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
+                  >
+                    <option value="">Select account</option>
+                    {cards
+                      .filter((c) => c.id !== cardId)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} •••• {c.last4}
+                        </option>
+                      ))}
+                  </select>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Category (not for transfer) */}
+          {type !== 'transfer' && (
             <div>
-              <label className="block text-sm font-medium text-[#64748B] mb-2">
-                Custom Category
-              </label>
+              <label className="block text-sm font-medium text-[#64748B] mb-3">Category</label>
+              <div className="grid grid-cols-4 gap-2">
+                {filteredCategories.map((cat) => {
+                  const IconComponent = getIconComponent(cat.icon);
+                  return (
+                    <button
+                      key={cat.name}
+                      type="button"
+                      onClick={() => setCategory(cat.name)}
+                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                        category === cat.name
+                          ? 'border-[#2DD4BF] bg-[#2DD4BF]/5'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <IconComponent className="w-6 h-6 text-[#64748B]" />
+                      <span className="text-xs text-center line-clamp-1">{cat.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {type !== 'transfer' && category === 'Other' && (
+            <div>
+              <label className="block text-sm font-medium text-[#64748B] mb-2">Custom Category</label>
               <input
                 type="text"
                 value={customCategory}
@@ -239,29 +377,33 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
             </div>
           )}
 
-          {/* Payment Method */}
-          <div>
-            <label className="block text-sm font-medium text-[#64748B] mb-3">Payment Method</label>
-            <div className="grid grid-cols-3 gap-2">
-              {['cash', 'debit', 'credit'].map((method) => (
-                <button
-                  key={method}
-                  type="button"
-                  onClick={() => setPaymentMethod(method as any)}
-                  className={`py-3 rounded-xl font-medium capitalize transition-colors ${
-                    paymentMethod === method
-                      ? 'bg-[#2DD4BF] text-white'
-                      : 'bg-gray-100 text-[#64748B]'
-                  }`}
-                >
-                  {method}
-                </button>
-              ))}
+          {/* Payment Method (not for transfer) */}
+          {type !== 'transfer' && (
+            <div>
+              <label className="block text-sm font-medium text-[#64748B] mb-3">
+                Payment Method
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {['cash', 'debit', 'credit'].map((method) => (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => setPaymentMethod(method as any)}
+                    className={`py-3 rounded-xl font-medium capitalize transition-colors ${
+                      paymentMethod === method
+                        ? 'bg-[#2DD4BF] text-white'
+                        : 'bg-gray-100 text-[#64748B]'
+                    }`}
+                  >
+                    {method}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Card Selection (if credit) */}
-          {paymentMethod === 'credit' && (
+          {/* Card Selection (if credit) - not for transfer */}
+          {type !== 'transfer' && paymentMethod === 'credit' && (
             <div>
               <label className="block text-sm font-medium text-[#64748B] mb-3">Select Card</label>
 
@@ -287,7 +429,9 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
                     </button>
                   ))}
 
-                  {cards.length === 0 && <div className="text-sm text-[#64748B]">No cards found.</div>}
+                  {cards.length === 0 && (
+                    <div className="text-sm text-[#64748B]">No cards found.</div>
+                  )}
                 </div>
               )}
             </div>
@@ -300,7 +444,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g., Grocery shopping"
+              placeholder={type === 'transfer' ? 'e.g., Transfer to Savings' : 'e.g., Grocery shopping'}
               required
               minLength={2}
               className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
@@ -313,7 +457,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
             disabled={submitLoading}
             className="w-full py-4 bg-[#2DD4BF] text-white font-semibold rounded-xl hover:bg-[#14B8A6] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {submitLoading ? 'Saving…' : 'Add Transaction'}
+            {submitLoading ? 'Saving…' : type === 'transfer' ? 'Transfer' : 'Add Transaction'}
           </button>
         </form>
       </div>
