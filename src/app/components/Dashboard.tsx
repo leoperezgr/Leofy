@@ -3,6 +3,7 @@ import { ArrowUpRight, ArrowDownRight, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { UiTransaction, normalizeTransactions } from '../utils/transactionsMapper';
 import { BarChart, Bar, XAxis, ResponsiveContainer } from 'recharts';
+import { formatMoney } from '../utils/formatMoney';
 
 type DashboardData = {
   income: number;
@@ -157,7 +158,7 @@ export function Dashboard() {
         <div className="flex items-start justify-between mb-6">
           <div>
             <p className="text-white/80 mb-2">Total Balance</p>
-            <h2 className="text-4xl lg:text-5xl font-bold">${balance.toFixed(2)}</h2>
+            <h2 className="text-4xl lg:text-5xl font-bold">${formatMoney(balance)}</h2>
           </div>
           <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
             <Wallet className="w-6 h-6" />
@@ -170,7 +171,7 @@ export function Dashboard() {
               <ArrowUpRight className="w-4 h-4" />
               <span className="text-sm text-white/80">Income</span>
             </div>
-            <p className="text-2xl font-semibold">${income.toFixed(2)}</p>
+            <p className="text-2xl font-semibold">${formatMoney(income)}</p>
           </div>
 
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
@@ -178,7 +179,7 @@ export function Dashboard() {
               <ArrowDownRight className="w-4 h-4" />
               <span className="text-sm text-white/80">Expenses</span>
             </div>
-            <p className="text-2xl font-semibold">${expenses.toFixed(2)}</p>
+            <p className="text-2xl font-semibold">${formatMoney(expenses)}</p>
           </div>
         </div>
       </div>
@@ -215,8 +216,8 @@ export function Dashboard() {
           </div>
           <div className="mb-4">
             <div className="flex items-baseline gap-2 mb-2">
-              <span className="text-3xl font-bold text-[#1F2933]">${totalCreditUsed.toFixed(0)}</span>
-              <span className="text-[#64748B]">/ ${totalCreditLimit.toFixed(0)}</span>
+              <span className="text-3xl font-bold text-[#1F2933]">${formatMoney(totalCreditUsed)}</span>
+              <span className="text-[#64748B]">/ ${formatMoney(totalCreditLimit)}</span>
             </div>
             <p className="text-sm text-[#64748B]">Total credit used</p>
           </div>
@@ -276,7 +277,7 @@ export function Dashboard() {
                   t.type === 'income' ? 'text-green-600' : 'text-[#1F2933]'
                 }`}
               >
-                {t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)}
+                {t.type === 'income' ? '+' : '-'}${formatMoney(t.amount)}
               </span>
             </div>
           ))}

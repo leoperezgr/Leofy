@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { getCategoryIcon } from '../utils/mockData';
 import { UiTransaction, normalizeTransactions } from '../utils/transactionsMapper';
 import * as LucideIcons from 'lucide-react';
+import { formatMoney } from '../utils/formatMoney';
 
 
 type FilterType = 'all' | 'income' | 'expense';
@@ -224,7 +225,7 @@ export function Transactions() {
                             }`}
                           >
                             {transaction.type === 'income' ? '+' : '-'}$
-                            {transaction.amount.toFixed(2)}
+                            {formatMoney(transaction.amount)}
                           </p>
                         </div>
                       </div>
