@@ -320,7 +320,9 @@ export function ManageCards() {
         </div>
         <div className="bg-white rounded-2xl p-4 lg:p-6 shadow-sm border border-gray-100 col-span-2 lg:col-span-1">
           <p className="text-sm text-[#64748B] mb-2">Total Credit Limit</p>
-          <p className="text-2xl lg:text-3xl font-bold text-[#1F2933]">${formatMoney(totals.totalLimit)}</p>
+          <p className="text-2xl lg:text-3xl font-bold text-[#1F2933]">
+          {formatMoney(totals.totalLimit)}
+        </p>
         </div>
       </div>
 
@@ -603,7 +605,8 @@ export function ManageCards() {
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#64748B]">$</span>
                       <input
-                        value={limit}
+                        inputMode="numeric"
+                        value={formatMoney(Number((limit)))}
                         onChange={(e) => setLimit(e.target.value)}
                         placeholder="e.g., 50000"
                         className="w-full pl-8 pr-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
