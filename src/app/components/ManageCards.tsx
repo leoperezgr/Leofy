@@ -605,12 +605,23 @@ export function ManageCards() {
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#64748B]">$</span>
                       <input
-                        inputMode="numeric"
-                        value={formatMoney(Number((limit)))}
-                        onChange={(e) => setLimit(e.target.value)}
-                        placeholder="e.g., 50000"
-                        className="w-full pl-8 pr-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
-                      />
+                      inputMode="decimal"
+                      value={
+                        limit
+                          ? formatMoney(Number(limit))
+                          : ""
+                      }
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/,/g, "");
+
+                        // Solo números y decimal
+                        if (!/^\d*\.?\d*$/.test(raw)) return;
+
+                        setLimit(raw);
+                      }}
+                      placeholder="e.g., 50,000"
+                      className="w-full pl-8 pr-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
+                    />
                     </div>
                     <p className="text-xs text-[#94A3B8] mt-2">
                       Tip: you can type “50000” (formatting is applied in display, not saved).
