@@ -1,0 +1,354 @@
+.cd-page {
+  margin: 0 auto;
+  max-width: 80rem;
+  padding: 1rem;
+}
+
+.cd-header,
+.cd-back-link-top {
+  margin-bottom: 1.5rem;
+}
+
+.cd-title {
+  margin-bottom: 0.5rem;
+  color: #1f2933;
+  font-size: 1.875rem;
+  font-weight: 600;
+}
+
+.cd-subtitle {
+  color: #64748b;
+}
+
+.cd-error-box,
+.cd-box {
+  border: 1px solid #f3f4f6;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+}
+
+.cd-error-box {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+}
+
+.cd-error-text {
+  color: #dc2626;
+  font-size: 0.875rem;
+}
+
+.cd-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #64748b;
+  transition: color 150ms ease;
+}
+
+.cd-back-link:hover {
+  color: #1f2933;
+}
+
+.cd-back-icon {
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
+.cd-back-text {
+  font-weight: 500;
+}
+
+.cd-not-found,
+.cd-empty-state {
+  padding: 3rem 0;
+  text-align: center;
+}
+
+.cd-not-found-link {
+  display: inline-block;
+  margin-top: 1rem;
+  color: #2dd4bf;
+}
+
+.cd-not-found-link:hover {
+  color: #14b8a6;
+}
+
+.cd-card-visual {
+  position: relative;
+  margin-bottom: 1.5rem;
+  height: 12rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 12px 24px rgb(15 23 42 / 0.18);
+  background-image: linear-gradient(to bottom right, var(--tw-gradient-from), var(--tw-gradient-to));
+}
+
+.cd-card-orb-large,
+.cd-card-orb-small {
+  position: absolute;
+  border-radius: 9999px;
+}
+
+.cd-card-orb-large {
+  right: -2rem;
+  top: -2rem;
+  height: 10rem;
+  width: 10rem;
+  background: rgb(255 255 255 / 0.1);
+}
+
+.cd-card-orb-small {
+  right: -1rem;
+  top: 4rem;
+  height: 8rem;
+  width: 8rem;
+  background: rgb(255 255 255 / 0.05);
+}
+
+.cd-card-content {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #fff;
+}
+
+.cd-card-kind {
+  margin-bottom: 0.25rem;
+  opacity: 0.8;
+  font-size: 0.875rem;
+}
+
+.cd-card-name {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.cd-card-last4 {
+  font-size: 1.875rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  letter-spacing: 0.05em;
+}
+
+.cd-box {
+  padding: 1.5rem;
+}
+
+.cd-box-spacing {
+  margin-bottom: 1.5rem;
+}
+
+.cd-stats-grid {
+  margin-bottom: 1.5rem;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.cd-label,
+.cd-usage-label {
+  margin-bottom: 0.5rem;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.cd-usage-label {
+  margin-bottom: 0;
+  font-weight: 500;
+}
+
+.cd-stat-value {
+  color: #1f2933;
+  font-size: 1.875rem;
+  font-weight: 700;
+}
+
+.cd-stat-value-green {
+  color: #16a34a;
+}
+
+.cd-usage-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cd-usage-header {
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cd-usage-percent {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.cd-usage-high {
+  color: #facc15;
+}
+
+.cd-usage-normal {
+  color: #3b82f6;
+}
+
+.cd-usage-icon {
+  height: 1rem;
+  width: 1rem;
+  color: #facc15;
+}
+
+.cd-usage-track {
+  height: 0.75rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: #f3f4f6;
+}
+
+.cd-usage-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 150ms ease;
+}
+
+.cd-usage-fill-high {
+  background: #facc15;
+}
+
+.cd-usage-fill-normal {
+  background: #3b82f6;
+}
+
+.cd-warning-box {
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border: 1px solid #fef3c7;
+  border-radius: 0.75rem;
+  background: #fefce8;
+  padding: 1rem;
+}
+
+.cd-warning-icon {
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+  height: 1.25rem;
+  width: 1.25rem;
+  color: #ca8a04;
+}
+
+.cd-warning-title {
+  color: #713f12;
+  font-weight: 500;
+}
+
+.cd-warning-text {
+  margin-top: 0.25rem;
+  color: #a16207;
+  font-size: 0.875rem;
+}
+
+.cd-section-title {
+  margin-bottom: 1rem;
+  color: #1f2933;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.cd-transactions-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.cd-transaction-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+}
+
+.cd-transaction-item-divider {
+  border-bottom: 1px solid #f9fafb;
+}
+
+.cd-transaction-left {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cd-transaction-icon-wrap {
+  display: flex;
+  height: 3rem;
+  width: 3rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+}
+
+.cd-transaction-icon {
+  height: 1.5rem;
+  width: 1.5rem;
+  color: #64748b;
+}
+
+.cd-transaction-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.cd-transaction-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1f2933;
+  font-weight: 500;
+}
+
+.cd-transaction-category {
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.cd-transaction-right {
+  text-align: right;
+}
+
+.cd-transaction-amount {
+  color: #1f2933;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.cd-transaction-date {
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+@media (min-width: 1024px) {
+  .cd-page {
+    padding: 2rem;
+  }
+
+  .cd-card-visual {
+    height: 14rem;
+    padding: 2rem;
+  }
+
+  .cd-card-name {
+    font-size: 1.875rem;
+  }
+
+  .cd-stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

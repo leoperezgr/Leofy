@@ -1,19 +1,221 @@
-import { useParams, Link } from 'react-router';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
-import { creditCards, transactions, getCategoryIcon } from '../utils/mockData';
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
-import * as LucideIcons from 'lucide-react';
+import { useEffect, useMemo, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import { ArrowLeft, AlertTriangle } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import * as LucideIcons from "lucide-react";
+import { formatMoney } from "../utils/formatMoney";
+import { getCategoryIcon } from "../utils/mockData"; // si ya tienes un mapper real, lo cambiamos luego
+import "../../styles/components/CardDetail.css";
+
+type ApiCard = {
+  id: string | number;
+  name: string;
+  last4: string | null;
+  credit_limit: number | string | null;
+  color?: string | null;
+};
+
+type ApiTx = {
+  id: string | number;
+  type: "INCOME" | "EXPENSE" | "income" | "expense";
+  amount: number | string;
+  description: string | null;
+  occurred_at: string;
+  category?: string | null;
+  category_name?: string | null; // por si backend manda nombre
+  category_id?: string | number | null;
+  card_id?: string | number | null;
+};
+
+function toId(v: string | number) {
+  return typeof v === "number" ? String(v) : String(v);
+}
+function toNumber(v: any) {
+  const n = typeof v === "string" ? Number(v) : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function colorToGradient(color?: string | null) {
+  switch ((color || "OTHER").toUpperCase()) {
+    case "RED":
+      return "from-red-500 to-rose-600";
+    case "ORANGE":
+      return "from-orange-500 to-amber-600";
+    case "BLUE":
+      return "from-blue-500 to-sky-600";
+    case "GOLD":
+      return "from-yellow-500 to-amber-600";
+    case "BLACK":
+      return "from-zinc-900 to-zinc-700";
+    case "PLATINUM":
+      return "from-slate-500 to-slate-700";
+    case "SILVER":
+      return "from-gray-400 to-gray-600";
+    case "PURPLE":
+      return "from-purple-500 to-fuchsia-600";
+    case "GREEN":
+      return "from-emerald-500 to-teal-600";
+    default:
+      return "from-[#2DD4BF] to-[#14B8A6]";
+  }
+}
 
 export function CardDetail() {
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
   const { cardId } = useParams<{ cardId: string }>();
-  const card = creditCards.find(c => c.id === cardId);
+
+  const [card, setCard] = useState<ApiCard | null>(null);
+  const [tx, setTx] = useState<ApiTx[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const authHeaders = (): Headers => {
+    const token = localStorage.getItem("leofy_token");
+    const h = new Headers();
+    if (token) h.set("Authorization", `Bearer ${token}`);
+    return h;
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!cardId) return;
+
+    async function load() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const h = authHeaders();
+
+        // 1) cargar cards y encontrar la tarjeta (porque tu backend actual solo tiene GET /api/cards)
+        const resCards = await fetch(`${API_BASE}/api/cards`, { headers: h });
+        const cardsJson = await resCards.json().catch(() => null);
+        if (!resCards.ok) throw new Error(cardsJson?.error || cardsJson?.message || "Failed to load cards");
+
+        const found = (Array.isArray(cardsJson) ? cardsJson : []).find(
+          (c: any) => toId(c.id) === String(cardId)
+        );
+
+        if (!found) {
+          if (!cancelled) setCard(null);
+          return;
+        }
+
+        // 2) cargar transacciones
+        const resTx = await fetch(`${API_BASE}/api/transactions`, { headers: h });
+        const txJson = await resTx.json().catch(() => null);
+        if (!resTx.ok) throw new Error(txJson?.error || txJson?.message || "Failed to load transactions");
+
+        if (cancelled) return;
+
+        setCard(found);
+        setTx(Array.isArray(txJson) ? txJson : []);
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message || "Error loading card details");
+          setCard(null);
+          setTx([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [API_BASE, cardId]);
+
+  const creditLimit = useMemo(() => toNumber(card?.credit_limit), [card]);
+
+  const cardTransactions = useMemo(() => {
+    if (!cardId) return [];
+    return tx
+      .filter((t) => {
+        const cid = (t as any).card_id ?? null;
+        return cid !== null && toId(cid) === String(cardId);
+      })
+      .map((t) => ({
+        id: toId(t.id),
+        amount: toNumber(t.amount),
+        description: t.description ?? "—",
+        category: (t as any).category_name ?? (t as any).category ?? "Uncategorized",
+        date: t.occurred_at,
+      }));
+  }, [tx, cardId]);
+
+  const usedAmount = useMemo(() => {
+    // sum de EXPENSE de esa tarjeta
+    return tx.reduce((sum, t) => {
+      const type = String((t as any).type || "").toUpperCase();
+      const cid = (t as any).card_id ?? null;
+      if (!cid || toId(cid) !== String(cardId)) return sum;
+      if (type !== "EXPENSE") return sum;
+      return sum + toNumber((t as any).amount);
+    }, 0);
+  }, [tx, cardId]);
+
+  const usagePercent = creditLimit > 0 ? (usedAmount / creditLimit) * 100 : 0;
+  const isHighUsage = usagePercent > 80;
+
+  const last30Days = useMemo(() => {
+    const days = Array.from({ length: 30 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (29 - i));
+      const iso = date.toISOString().split("T")[0];
+
+      const daySpending = cardTransactions
+        .filter((t) => new Date(t.date).toISOString().split("T")[0] === iso)
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      return { date: date.getDate(), amount: daySpending };
+    });
+
+    return days;
+  }, [cardTransactions]);
+
+  const getIconComponent = (iconName: string) => {
+    const Icon = (LucideIcons as any)[iconName];
+    return Icon || LucideIcons.Circle;
+  };
+
+  if (loading) {
+    return (
+      <div className="cd-page">
+        <div className="cd-header">
+          <h1 className="cd-title">Card Details</h1>
+          <p className="cd-subtitle">Loading…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="cd-page">
+        <div className="cd-error-box">
+          <p className="cd-error-text">{error}</p>
+        </div>
+
+        <Link
+          to="/cards"
+          className="cd-back-link"
+        >
+          <ArrowLeft className="cd-back-icon" />
+          <span className="cd-back-text">Back to Cards</span>
+        </Link>
+      </div>
+    );
+  }
 
   if (!card) {
     return (
-      <div className="max-w-7xl mx-auto p-4 lg:p-8">
-        <div className="text-center py-12">
-          <p className="text-[#64748B]">Card not found</p>
-          <Link to="/cards" className="text-[#2DD4BF] hover:text-[#14B8A6] mt-4 inline-block">
+      <div className="cd-page">
+        <div className="cd-not-found">
+          <p className="cd-subtitle">Card not found</p>
+          <Link to="/cards" className="cd-not-found-link">
             Back to Cards
           </Link>
         </div>
@@ -21,104 +223,80 @@ export function CardDetail() {
     );
   }
 
-  const cardTransactions = transactions.filter(t => t.cardId === cardId);
-  const usagePercent = (card.usedAmount / card.creditLimit) * 100;
-  const isHighUsage = usagePercent > 80;
-
-  // Generate chart data (simulated daily spending)
-  const last30Days = Array.from({ length: 30 }, (_, i) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (29 - i));
-    const dayStr = date.toISOString().split('T')[0];
-    
-    const daySpending = cardTransactions
-      .filter(t => t.date === dayStr)
-      .reduce((sum, t) => sum + t.amount, 0);
-    
-    return {
-      date: date.getDate(),
-      amount: daySpending,
-    };
-  });
-
-  const getIconComponent = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Circle;
-  };
+  const gradient = colorToGradient(card.color);
+  const available = Math.max(0, creditLimit - usedAmount);
 
   return (
-    <div className="max-w-7xl mx-auto p-4 lg:p-8">
+    <div className="cd-page">
       {/* Back Button */}
-      <Link 
-        to="/cards" 
-        className="inline-flex items-center gap-2 text-[#64748B] hover:text-[#1F2933] mb-6 transition-colors"
+      <Link
+        to="/cards"
+        className="cd-back-link cd-back-link-top"
       >
-        <ArrowLeft className="w-5 h-5" />
-        <span className="font-medium">Back to Cards</span>
+        <ArrowLeft className="cd-back-icon" />
+        <span className="cd-back-text">Back to Cards</span>
       </Link>
 
       {/* Card Visual */}
-      <div className={`relative h-48 lg:h-56 rounded-2xl bg-gradient-to-br ${card.color} p-6 lg:p-8 mb-6 overflow-hidden shadow-lg`}>
-        {/* Decorative circles */}
-        <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/10" />
-        <div className="absolute -right-4 top-16 w-32 h-32 rounded-full bg-white/5" />
-        
-        <div className="relative z-10 h-full flex flex-col justify-between text-white">
+      <div
+        className={`cd-card-visual ${gradient}`}
+      >
+        <div className="cd-card-orb-large" />
+        <div className="cd-card-orb-small" />
+
+        <div className="cd-card-content">
           <div>
-            <p className="text-sm opacity-80 mb-1">Credit Card</p>
-            <h2 className="text-2xl lg:text-3xl font-semibold">{card.name}</h2>
+            <p className="cd-card-kind">Credit Card</p>
+            <h2 className="cd-card-name">{card.name}</h2>
           </div>
           <div>
-            <p className="text-3xl font-mono tracking-wider">•••• •••• •••• {card.last4}</p>
+            <p className="cd-card-last4">•••• •••• •••• {card.last4 ?? "----"}</p>
           </div>
         </div>
       </div>
 
       {/* Usage Stats */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
-        <div className="grid lg:grid-cols-3 gap-6 mb-6">
+      <div className="cd-box cd-box-spacing">
+        <div className="cd-stats-grid">
           <div>
-            <p className="text-sm text-[#64748B] mb-2">Used Amount</p>
-            <p className="text-3xl font-bold text-[#1F2933]">${card.usedAmount.toFixed(2)}</p>
+            <p className="cd-label">Used Amount</p>
+            <p className="cd-stat-value">${formatMoney(usedAmount)}</p>
           </div>
           <div>
-            <p className="text-sm text-[#64748B] mb-2">Credit Limit</p>
-            <p className="text-3xl font-bold text-[#1F2933]">${card.creditLimit.toFixed(2)}</p>
+            <p className="cd-label">Credit Limit</p>
+            <p className="cd-stat-value">${formatMoney(creditLimit)}</p>
           </div>
           <div>
-            <p className="text-sm text-[#64748B] mb-2">Available Credit</p>
-            <p className="text-3xl font-bold text-green-600">${(card.creditLimit - card.usedAmount).toFixed(2)}</p>
+            <p className="cd-label">Available Credit</p>
+            <p className="cd-stat-value cd-stat-value-green">${formatMoney(available)}</p>
           </div>
         </div>
 
         {/* Usage Bar */}
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-[#64748B]">Credit Usage</span>
-            <div className="flex items-center gap-2">
-              <span className={`text-sm font-semibold ${isHighUsage ? 'text-[#FACC15]' : 'text-[#3B82F6]'}`}>
+          <div className="cd-usage-header">
+            <span className="cd-usage-label">Credit Usage</span>
+            <div className="cd-usage-right">
+              <span className={`cd-usage-percent ${isHighUsage ? "cd-usage-high" : "cd-usage-normal"}`}>
                 {usagePercent.toFixed(1)}%
               </span>
-              {isHighUsage && <AlertTriangle className="w-4 h-4 text-[#FACC15]" />}
+              {isHighUsage && <AlertTriangle className="cd-usage-icon" />}
             </div>
           </div>
-          <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-            <div 
-              className={`h-full rounded-full transition-all ${
-                isHighUsage ? 'bg-[#FACC15]' : 'bg-[#3B82F6]'
-              }`}
+          <div className="cd-usage-track">
+            <div
+              className={`cd-usage-fill ${isHighUsage ? "cd-usage-fill-high" : "cd-usage-fill-normal"}`}
               style={{ width: `${Math.min(usagePercent, 100)}%` }}
             />
           </div>
         </div>
 
-        {/* Warning Message */}
         {isHighUsage && (
-          <div className="flex items-start gap-3 p-4 bg-yellow-50 rounded-xl border border-yellow-100 mt-6">
-            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+          <div className="cd-warning-box">
+            <AlertTriangle className="cd-warning-icon" />
             <div>
-              <p className="font-medium text-yellow-900">High usage warning</p>
-              <p className="text-sm text-yellow-700 mt-1">
+              <p className="cd-warning-title">High usage warning</p>
+              <p className="cd-warning-text">
                 You've used more than 80% of your credit limit. Consider paying down your balance to avoid fees.
               </p>
             </div>
@@ -127,47 +305,34 @@ export function CardDetail() {
       </div>
 
       {/* Spending Chart */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
-        <h3 className="text-lg font-semibold text-[#1F2933] mb-4">Monthly Spending</h3>
+      <div className="cd-box cd-box-spacing">
+        <h3 className="cd-section-title">Monthly Spending</h3>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={last30Days}>
-            <XAxis 
-              dataKey="date" 
-              stroke="#94A3B8"
-              style={{ fontSize: '12px' }}
-            />
-            <YAxis 
-              stroke="#94A3B8"
-              style={{ fontSize: '12px' }}
-            />
-            <Tooltip 
-              contentStyle={{ 
-                backgroundColor: '#fff',
-                border: '1px solid #E2E8F0',
-                borderRadius: '8px',
-                fontSize: '14px'
+            <XAxis dataKey="date" stroke="#94A3B8" style={{ fontSize: "12px" }} />
+            <YAxis stroke="#94A3B8" style={{ fontSize: "12px" }} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "#fff",
+                border: "1px solid #E2E8F0",
+                borderRadius: "8px",
+                fontSize: "14px",
               }}
-              formatter={(value: number) => [`$${value.toFixed(2)}`, 'Amount']}
+              formatter={(value: number) => [`$${formatMoney(Number(value))}`, "Amount"]}
             />
-            <Line 
-              type="monotone" 
-              dataKey="amount" 
-              stroke="#3B82F6" 
-              strokeWidth={2}
-              dot={{ fill: '#3B82F6', r: 3 }}
-            />
+            <Line type="monotone" dataKey="amount" stroke="#3B82F6" strokeWidth={2} dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
       {/* Transactions */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <h3 className="text-lg font-semibold text-[#1F2933] mb-4">
+      <div className="cd-box">
+        <h3 className="cd-section-title">
           Transactions ({cardTransactions.length})
         </h3>
-        
+
         {cardTransactions.length > 0 ? (
-          <div className="space-y-3">
+          <div className="cd-transactions-list">
             {cardTransactions
               .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
               .map((transaction, index) => {
@@ -175,25 +340,25 @@ export function CardDetail() {
                 return (
                   <div
                     key={transaction.id}
-                    className={`flex items-center justify-between py-3 ${
-                      index !== cardTransactions.length - 1 ? 'border-b border-gray-50' : ''
+                    className={`cd-transaction-item ${
+                      index !== cardTransactions.length - 1 ? "cd-transaction-item-divider" : ""
                     }`}
                   >
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center">
-                        <IconComponent className="w-6 h-6 text-[#64748B]" />
+                    <div className="cd-transaction-left">
+                      <div className="cd-transaction-icon-wrap">
+                        <IconComponent className="cd-transaction-icon" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-[#1F2933] truncate">{transaction.description}</p>
-                        <p className="text-sm text-[#64748B]">{transaction.category}</p>
+                      <div className="cd-transaction-main">
+                        <p className="cd-transaction-description">{transaction.description}</p>
+                        <p className="cd-transaction-category">{transaction.category}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-lg font-semibold text-[#1F2933]">
-                        -${transaction.amount.toFixed(2)}
+                    <div className="cd-transaction-right">
+                      <p className="cd-transaction-amount">
+                        -${formatMoney(transaction.amount)}
                       </p>
-                      <p className="text-xs text-[#94A3B8]">
-                        {new Date(transaction.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      <p className="cd-transaction-date">
+                        {new Date(transaction.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                       </p>
                     </div>
                   </div>
@@ -201,8 +366,8 @@ export function CardDetail() {
               })}
           </div>
         ) : (
-          <div className="text-center py-8">
-            <p className="text-[#64748B]">No transactions yet with this card</p>
+          <div className="cd-empty-state">
+            <p className="cd-subtitle">No transactions yet with this card</p>
           </div>
         )}
       </div>

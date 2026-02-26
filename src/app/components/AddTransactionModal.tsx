@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { categories } from '../utils/mockData';
 import * as LucideIcons from 'lucide-react';
+import '../../styles/components/AddTransactionModal.css';
 
 interface AddTransactionModalProps {
   open: boolean;
@@ -22,7 +23,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
   const [type, setType] = useState<'income' | 'expense' | 'transfer'>('expense');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'debit' | 'credit'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'debit' | 'credit'>('credit');
   const [cardId, setCardId] = useState(''); // credit card selection OR transfer fromCardId
   const [toCardId, setToCardId] = useState(''); // transfer toCardId
   const [description, setDescription] = useState('');
@@ -31,6 +32,14 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
   const [cards, setCards] = useState<Card[]>([]);
   const [cardsLoading, setCardsLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
+
+  const isCreditCard = (c: Card) => {
+  const n = Number((c as any).credit_limit ?? (c as any).limit ?? 0);
+    return Number.isFinite(n) && n > 0;
+  };
+
+  const creditCardsOnly = cards.filter(isCreditCard);
+  const debitCardsOnly = cards.filter((c) => !isCreditCard(c));
 
   const filteredCategories = categories.filter((cat) =>
     cat.type === (type === 'transfer' ? 'expense' : type)
@@ -92,14 +101,29 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
     })();
   }, [open, API_BASE]);
 
+  useEffect(() => {
+  if (type === "transfer") {
+    setPaymentMethod("debit"); // o "cash", da igual porque no se muestra
+    setCardId("");
+    setToCardId("");
+    return;
+  }
+
+  if (type === "income") {
+    setPaymentMethod("debit");
+    setCardId("");
+    return;
+  }
+
+  // expense default a credit
+  setPaymentMethod("credit");
+  setCardId("");
+}, [type]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const desc = description.trim();
-    if (!desc) {
-      alert('Please enter a description');
-      return;
-    }
 
     const amountNum = Number(amount);
     if (!Number.isFinite(amountNum) || amountNum <= 0) {
@@ -116,11 +140,15 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
       // ✅ TRANSFER
       if (type === 'transfer') {
         if (!cardId) {
-          alert('Please select FROM account');
+          alert('Please select FROM debit account');
           return;
         }
         if (!toCardId) {
           alert('Please select TO account');
+          return;
+        }
+        if (!debitCardsOnly.some((c) => c.id === cardId)) {
+          alert('FROM account must be a debit account');
           return;
         }
         if (cardId === toCardId) {
@@ -132,7 +160,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
           fromCardId: cardId,
           toCardId,
           amount: amountNum,
-          description: desc,
+          description: desc || 'Transfer',
           date: new Date().toISOString(),
         };
 
@@ -153,7 +181,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
         setCategory('');
         setCustomCategory('');
         setDescription('');
-        setPaymentMethod('cash');
+        setPaymentMethod('credit');
         setCardId('');
         setToCardId('');
         return;
@@ -165,13 +193,18 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
         alert('Please enter a category');
         return;
       }
+      if ((paymentMethod === 'credit' || paymentMethod === 'debit') && !cardId) {
+        alert('Please select a card/account');
+        return;
+      }
 
       const payload = {
         type, // "income" | "expense"
         amount: amountNum,
         category: finalCategory,
-        description: desc,
+        description: desc || finalCategory,
         date: new Date().toISOString(),
+        card_id: paymentMethod === 'cash' ? null : cardId || null,
         // Note: backend might strip paymentMethod/cardId today depending on Zod schema
       };
 
@@ -192,7 +225,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
       setCategory('');
       setCustomCategory('');
       setDescription('');
-      setPaymentMethod('cash');
+      setPaymentMethod('credit');
       setCardId('');
       setToCardId('');
     } catch (err: any) {
@@ -210,34 +243,34 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="atm-overlay" onClick={onClose}>
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="atm-backdrop" />
 
       {/* Modal */}
       <div
-        className="relative w-full max-w-md bg-white rounded-3xl p-6 max-h-[90vh] overflow-y-auto"
+        className="atm-modal"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-semibold text-[#1F2933]">Add Transaction</h2>
+      {/* Header */}
+        <div className="atm-header">
+          <h2 className="atm-title">Add Transaction</h2>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            className="atm-close-button"
           >
-            <X className="w-5 h-5" />
+            <X className="atm-close-icon" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="atm-form">
           {/* Type Toggle */}
-          <div className="grid grid-cols-3 gap-2 p-1 bg-gray-100 rounded-xl">
+          <div className="atm-type-toggle">
             <button
               type="button"
               onClick={() => setType('expense')}
-              className={`py-3 rounded-lg font-medium transition-colors ${
-                type === 'expense' ? 'bg-white text-[#1F2933] shadow-sm' : 'text-[#64748B]'
+              className={`atm-type-button ${
+                type === 'expense' ? 'atm-type-button-active' : 'atm-type-button-inactive'
               }`}
             >
               Expense
@@ -245,8 +278,8 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
             <button
               type="button"
               onClick={() => setType('income')}
-              className={`py-3 rounded-lg font-medium transition-colors ${
-                type === 'income' ? 'bg-white text-[#1F2933] shadow-sm' : 'text-[#64748B]'
+              className={`atm-type-button ${
+                type === 'income' ? 'atm-type-button-active' : 'atm-type-button-inactive'
               }`}
             >
               Income
@@ -254,8 +287,8 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
             <button
               type="button"
               onClick={() => setType('transfer')}
-              className={`py-3 rounded-lg font-medium transition-colors ${
-                type === 'transfer' ? 'bg-white text-[#1F2933] shadow-sm' : 'text-[#64748B]'
+              className={`atm-type-button ${
+                type === 'transfer' ? 'atm-type-button-active' : 'atm-type-button-inactive'
               }`}
             >
               Transfer
@@ -264,9 +297,9 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
 
           {/* Amount */}
           <div>
-            <label className="block text-sm font-medium text-[#64748B] mb-2">Amount</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-semibold text-[#1F2933]">
+            <label className="atm-label">Amount</label>
+            <div className="atm-amount-wrap">
+              <span className="atm-currency">
                 $
               </span>
               <input
@@ -276,7 +309,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
                 onChange={(e) => handleAmountChange(e.target.value)}
                 placeholder="0.00"
                 required
-                className="w-full pl-10 pr-4 py-4 text-2xl font-semibold bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
+                className="atm-amount-input"
               />
             </div>
           </div>
@@ -285,21 +318,21 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
           {type === 'transfer' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[#64748B] mb-2">
+                <label className="atm-label">
                   From (Debit Account)
                 </label>
 
                 {cardsLoading ? (
-                  <div className="text-sm text-[#64748B]">Loading accounts…</div>
+                  <div className="atm-loading-text">Loading accounts…</div>
                 ) : (
                   <select
                     value={cardId}
                     onChange={(e) => setCardId(e.target.value)}
                     required
-                    className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
+                    className="atm-select"
                   >
                     <option value="">Select account</option>
-                    {cards.map((c) => (
+                    {debitCardsOnly.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name} •••• {c.last4}
                       </option>
@@ -309,18 +342,18 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#64748B] mb-2">
-                  To (Debit Account)
+                <label className="atm-label">
+                  To (Debit/Credit Account)
                 </label>
 
                 {cardsLoading ? (
-                  <div className="text-sm text-[#64748B]">Loading accounts…</div>
+                  <div className="atm-loading-text">Loading accounts…</div>
                 ) : (
                   <select
                     value={toCardId}
                     onChange={(e) => setToCardId(e.target.value)}
                     required
-                    className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
+                    className="atm-select"
                   >
                     <option value="">Select account</option>
                     {cards
@@ -339,8 +372,8 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
           {/* Category (not for transfer) */}
           {type !== 'transfer' && (
             <div>
-              <label className="block text-sm font-medium text-[#64748B] mb-3">Category</label>
-              <div className="grid grid-cols-4 gap-2">
+              <label className="atm-label category-label">Category</label>
+              <div className="atm-category-grid">
                 {filteredCategories.map((cat) => {
                   const IconComponent = getIconComponent(cat.icon);
                   return (
@@ -348,14 +381,14 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
                       key={cat.name}
                       type="button"
                       onClick={() => setCategory(cat.name)}
-                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                      className={`atm-category-button ${
                         category === cat.name
-                          ? 'border-[#2DD4BF] bg-[#2DD4BF]/5'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'atm-category-button-active'
+                          : 'atm-category-button-inactive'
                       }`}
                     >
-                      <IconComponent className="w-6 h-6 text-[#64748B]" />
-                      <span className="text-xs text-center line-clamp-1">{cat.name}</span>
+                      <IconComponent className="atm-category-icon" />
+                      <span className="atm-category-name">{cat.name}</span>
                     </button>
                   );
                 })}
@@ -365,14 +398,14 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
 
           {type !== 'transfer' && category === 'Other' && (
             <div>
-              <label className="block text-sm font-medium text-[#64748B] mb-2">Custom Category</label>
+              <label className="atm-label">Custom Category</label>
               <input
                 type="text"
                 value={customCategory}
                 onChange={(e) => setCustomCategory(e.target.value)}
                 placeholder="Enter category name"
                 required
-                className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
+                className="atm-text-input"
               />
             </div>
           )}
@@ -380,19 +413,19 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
           {/* Payment Method (not for transfer) */}
           {type !== 'transfer' && (
             <div>
-              <label className="block text-sm font-medium text-[#64748B] mb-3">
-                Payment Method
+              <label className="atm-label category-label">
+                {type === 'income' ? 'Payment Received' : 'Payment Method'}
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                {['cash', 'debit', 'credit'].map((method) => (
+              <div className="atm-method-grid">
+                {(type === 'income' ? ['debit', 'cash'] : ['credit', 'debit', 'cash']).map((method) => (
                   <button
                     key={method}
                     type="button"
                     onClick={() => setPaymentMethod(method as any)}
-                    className={`py-3 rounded-xl font-medium capitalize transition-colors ${
+                    className={`atm-method-button ${
                       paymentMethod === method
-                        ? 'bg-[#2DD4BF] text-white'
-                        : 'bg-gray-100 text-[#64748B]'
+                        ? 'atm-method-button-active'
+                        : 'atm-method-button-inactive'
                     }`}
                   >
                     {method}
@@ -402,35 +435,43 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
             </div>
           )}
 
-          {/* Card Selection (if credit) - not for transfer */}
-          {type !== 'transfer' && paymentMethod === 'credit' && (
+          {/* Card Selection (if credit/debit) - not for transfer */}
+          {type !== 'transfer' && (paymentMethod === 'credit' || paymentMethod === 'debit') && (
             <div>
-              <label className="block text-sm font-medium text-[#64748B] mb-3">Select Card</label>
+              <label className="atm-label category-label">
+                {paymentMethod === 'credit' ? 'Select Credit Card' : 'Select Debit Account'}
+              </label>
 
               {cardsLoading ? (
-                <div className="text-sm text-[#64748B]">Loading cards…</div>
+                <div className="atm-loading-text">Loading cards…</div>
               ) : (
-                <div className="space-y-2">
-                  {cards.map((card) => (
+                <div className="atm-card-list">
+                  {(type === 'income' ? debitCardsOnly : (paymentMethod === 'credit' ? creditCardsOnly : debitCardsOnly)).map((card) => (
                     <button
                       key={card.id}
                       type="button"
                       onClick={() => setCardId(card.id)}
-                      className={`w-full p-4 rounded-xl border-2 transition-all ${
+                      className={`atm-card-button ${
                         cardId === card.id
-                          ? 'border-[#2DD4BF] bg-[#2DD4BF]/5'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'atm-card-button-active'
+                          : 'atm-card-button-inactive'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-[#1F2933]">{card.name}</span>
-                        <span className="text-sm text-[#64748B]">•••• {card.last4}</span>
+                      <div className="atm-card-row">
+                        <span className="atm-card-name">{card.name}</span>
+                        <span className="atm-card-last4">•••• {card.last4}</span>
                       </div>
                     </button>
                   ))}
 
-                  {cards.length === 0 && (
-                    <div className="text-sm text-[#64748B]">No cards found.</div>
+                  {(type === 'income' ? debitCardsOnly : (paymentMethod === 'credit' ? creditCardsOnly : debitCardsOnly)).length === 0 && (
+                    <div className="atm-loading-text">
+                      {type === 'income'
+                        ? 'No debit accounts found.'
+                        : paymentMethod === 'credit'
+                        ? 'No credit cards found.'
+                        : 'No debit accounts found.'}
+                    </div>
                   )}
                 </div>
               )}
@@ -439,15 +480,13 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-[#64748B] mb-2">Description</label>
+            <label className="atm-label">Description</label>
             <input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={type === 'transfer' ? 'e.g., Transfer to Savings' : 'e.g., Grocery shopping'}
-              required
-              minLength={2}
-              className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
+              className="atm-text-input"
             />
           </div>
 
@@ -455,7 +494,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
           <button
             type="submit"
             disabled={submitLoading}
-            className="w-full py-4 bg-[#2DD4BF] text-white font-semibold rounded-xl hover:bg-[#14B8A6] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+            className="atm-submit-button"
           >
             {submitLoading ? 'Saving…' : type === 'transfer' ? 'Transfer' : 'Add Transaction'}
           </button>
