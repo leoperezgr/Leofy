@@ -1,0 +1,309 @@
+.cc-page {
+  margin: 0 auto;
+  max-width: 80rem;
+  padding: 1rem;
+}
+
+.cc-header {
+  margin-bottom: 1.5rem;
+}
+
+.cc-title {
+  margin-bottom: 0.5rem;
+  color: #1f2933;
+  font-size: 1.875rem;
+  font-weight: 600;
+}
+
+.cc-subtitle {
+  color: #64748b;
+}
+
+.cc-error-box,
+.cc-summary-card,
+.cc-content-box,
+.cc-card-link {
+  border: 1px solid #f3f4f6;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+}
+
+.cc-error-box {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+}
+
+.cc-error-text {
+  color: #dc2626;
+  font-size: 0.875rem;
+}
+
+.cc-summary-grid {
+  margin-bottom: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.cc-summary-card {
+  padding: 1rem;
+}
+
+.cc-summary-label {
+  margin-bottom: 0.5rem;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.cc-summary-value {
+  color: #1f2933;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.cc-content-box {
+  padding: 1.5rem;
+}
+
+.cc-muted-text {
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.cc-tip-text {
+  margin-top: 0.5rem;
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+.cc-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.cc-card-link {
+  display: block;
+  padding: 1.5rem;
+  transition: box-shadow 150ms ease;
+}
+
+.cc-card-link:hover {
+  box-shadow: 0 8px 20px rgb(15 23 42 / 0.12);
+}
+
+.cc-card-visual {
+  position: relative;
+  margin-bottom: 1rem;
+  height: 10rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  background-image: linear-gradient(to bottom right, var(--tw-gradient-from), var(--tw-gradient-to));
+}
+
+.cc-card-orb-large,
+.cc-card-orb-small {
+  position: absolute;
+  border-radius: 9999px;
+}
+
+.cc-card-orb-large {
+  right: -2rem;
+  top: -2rem;
+  height: 8rem;
+  width: 8rem;
+  background: rgb(255 255 255 / 0.1);
+}
+
+.cc-card-orb-small {
+  right: -1rem;
+  top: 3rem;
+  height: 6rem;
+  width: 6rem;
+  background: rgb(255 255 255 / 0.05);
+}
+
+.cc-card-visual-content {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #fff;
+}
+
+.cc-card-kind {
+  margin-bottom: 0.25rem;
+  opacity: 0.8;
+  font-size: 0.875rem;
+}
+
+.cc-card-name {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.cc-card-last4 {
+  font-size: 1.5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  letter-spacing: 0.05em;
+}
+
+.cc-card-body {
+  display: grid;
+  gap: 1rem;
+}
+
+.cc-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cc-card-limit-col {
+  text-align: right;
+}
+
+.cc-card-label {
+  margin-bottom: 0.25rem;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.cc-card-used-value {
+  color: #1f2933;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.cc-card-limit-value {
+  color: #64748b;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.cc-usage-header {
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cc-usage-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cc-usage-percent {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.cc-usage-high {
+  color: #facc15;
+}
+
+.cc-usage-normal {
+  color: #3b82f6;
+}
+
+.cc-usage-icon {
+  height: 1rem;
+  width: 1rem;
+  color: #facc15;
+}
+
+.cc-usage-track {
+  height: 0.75rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: #f3f4f6;
+}
+
+.cc-usage-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 150ms ease;
+}
+
+.cc-usage-fill-high {
+  background: #facc15;
+}
+
+.cc-usage-fill-normal {
+  background: #3b82f6;
+}
+
+.cc-warning-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  border: 1px solid #fef3c7;
+  border-radius: 0.75rem;
+  background: #fefce8;
+  padding: 0.75rem;
+}
+
+.cc-warning-icon {
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+  height: 1.25rem;
+  width: 1.25rem;
+  color: #ca8a04;
+}
+
+.cc-warning-title {
+  color: #713f12;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.cc-warning-text {
+  margin-top: 0.25rem;
+  color: #a16207;
+  font-size: 0.75rem;
+}
+
+.cc-view-details {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: #2dd4bf;
+  transition: color 150ms ease;
+}
+
+.cc-view-details:hover {
+  color: #14b8a6;
+}
+
+.cc-view-details-text {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.cc-view-details-icon {
+  margin-left: 0.25rem;
+  height: 1rem;
+  width: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .cc-page {
+    padding: 2rem;
+  }
+
+  .cc-summary-card {
+    padding: 1.5rem;
+  }
+
+  .cc-summary-value {
+    font-size: 1.875rem;
+  }
+
+  .cc-card-visual {
+    height: 12rem;
+  }
+}

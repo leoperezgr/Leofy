@@ -1,0 +1,277 @@
+.atm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.atm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.atm-modal {
+  position: relative;
+  width: 100%;
+  max-width: 28rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 1.5rem;
+  background: #fff;
+  padding: 1.5rem;
+}
+
+.atm-header {
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.atm-title {
+  color: #1f2933;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.atm-close-button {
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 9999px;
+  background: #f3f4f6;
+  transition: background-color 150ms ease;
+}
+
+.atm-close-button:hover {
+  background: #e5e7eb;
+}
+
+.atm-close-icon {
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
+.atm-form {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.atm-type-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  background: #f3f4f6;
+  padding: 0.25rem;
+}
+
+.atm-type-button {
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.75rem 0;
+  font-weight: 500;
+  transition: all 150ms ease;
+}
+
+.atm-type-button-active {
+  background: #fff;
+  color: #1f2933;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+}
+
+.atm-type-button-inactive {
+  background: transparent;
+  color: #64748b;
+}
+
+.atm-label {
+  margin-bottom: 0.5rem;
+  display: block;
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.category-label {
+  margin-bottom: 0.75rem;
+}
+
+.atm-amount-wrap {
+  position: relative;
+}
+
+.atm-currency {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #1f2933;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.atm-amount-input {
+  width: 100%;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+  padding: 1rem 1rem 1rem 2.5rem;
+  color: #1f2933;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.atm-amount-input:focus,
+.atm-select:focus,
+.atm-text-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #2dd4bf;
+}
+
+.atm-loading-text {
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.atm-select,
+.atm-text-input {
+  width: 100%;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+  padding: 0.75rem 1rem;
+}
+
+.atm-category-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.atm-category-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  border: 2px solid #e5e7eb;
+  padding: 0.75rem;
+  transition: all 150ms ease;
+}
+
+.atm-category-button-active {
+  border-color: #2dd4bf;
+  background: rgb(45 212 191 / 0.05);
+}
+
+.atm-category-button-inactive:hover {
+  border-color: #d1d5db;
+}
+
+.atm-category-icon {
+  height: 1.5rem;
+  width: 1.5rem;
+  color: #64748b;
+}
+
+.atm-category-name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.atm-method-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.atm-method-button {
+  border: 0;
+  border-radius: 0.75rem;
+  padding: 0.75rem 0;
+  text-transform: capitalize;
+  font-weight: 500;
+  transition: all 150ms ease;
+}
+
+.atm-method-button-active {
+  background: #2dd4bf;
+  color: #fff;
+}
+
+.atm-method-button-inactive {
+  background: #f3f4f6;
+  color: #64748b;
+}
+
+.atm-card-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.atm-card-button {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 2px solid #e5e7eb;
+  padding: 1rem;
+  transition: all 150ms ease;
+}
+
+.atm-card-button-active {
+  border-color: #2dd4bf;
+  background: rgb(45 212 191 / 0.05);
+}
+
+.atm-card-button-inactive:hover {
+  border-color: #d1d5db;
+}
+
+.atm-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.atm-card-name {
+  color: #1f2933;
+  font-weight: 500;
+}
+
+.atm-card-last4 {
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.atm-submit-button {
+  width: 100%;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #2dd4bf;
+  padding: 1rem 0;
+  color: #fff;
+  font-weight: 600;
+  transition: background-color 150ms ease, opacity 150ms ease;
+}
+
+.atm-submit-button:hover {
+  background: #14b8a6;
+}
+
+.atm-submit-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}

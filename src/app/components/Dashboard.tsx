@@ -2,13 +2,15 @@ import { Link } from 'react-router-dom';
 import { ArrowUpRight, ArrowDownRight, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { UiTransaction, normalizeTransactions } from '../utils/transactionsMapper';
-import { BarChart, Bar, XAxis, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, ResponsiveContainer, LabelList } from 'recharts';
 import { formatMoney } from '../utils/formatMoney';
 
 type DashboardData = {
   income: number;
   expenses: number;
   balance: number;
+  weekly_spending?: Array<{ day: string; amount: number }>;
+  weekly_total_expenses?: number;
   recentTransactions: Array<{
     id: string;
     type: 'INCOME' | 'EXPENSE';
@@ -21,9 +23,62 @@ type DashboardData = {
     id: string;
     name: string;
     last4: string | null;
+    brand?: 'VISA' | 'MASTERCARD' | 'AMEX' | 'OTHER' | null;
+    color?: string | null;
     credit_limit: number | null;
+    used_amount?: number | string | null;
   }>;
 };
+
+function toNumber(v: unknown) {
+  const n = typeof v === 'string' ? Number(v) : Number(v ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function cardColorToGradient(color?: string | null) {
+  switch ((color || 'OTHER').toUpperCase()) {
+    case 'RED':
+      return 'from-red-500 to-rose-600';
+    case 'ORANGE':
+      return 'from-orange-500 to-amber-600';
+    case 'BLUE':
+      return 'from-blue-500 to-indigo-600';
+    case 'GOLD':
+      return 'from-yellow-400 to-amber-600';
+    case 'BLACK':
+      return 'from-gray-900 to-gray-700';
+    case 'PLATINUM':
+      return 'from-slate-300 to-slate-500';
+    case 'SILVER':
+      return 'from-gray-300 to-gray-500';
+    case 'PURPLE':
+      return 'from-purple-500 to-fuchsia-600';
+    case 'GREEN':
+      return 'from-emerald-500 to-teal-600';
+    default:
+      return 'from-[#2DD4BF] to-[#14B8A6]';
+  }
+}
+
+function renderBarAmountLabel(props: any) {
+  const { x, y, width, value } = props;
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount)) return null;
+  const labelY = typeof y === 'number' ? Math.max(14, y - 6) : 14;
+
+  return (
+    <text
+      x={x + width / 2}
+      y={labelY}
+      textAnchor="middle"
+      fill="#1F2933"
+      fontSize={12}
+      fontWeight={500}
+    >
+      ${formatMoney(amount)}
+    </text>
+  );
+}
 
 export function Dashboard() {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
@@ -92,33 +147,20 @@ export function Dashboard() {
   const expenses = data?.expenses ?? 0;
   const balance = data?.balance ?? 0;
 
-  const usagePercentage = income > 0 ? (expenses / income) * 100 : 0;
-
-  // Last 7 days (for chart)
-  const last7Days = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (6 - i));
-      return date.toISOString().split('T')[0];
-    });
-  }, []);
-
-  // Chart data from recentTransactions (group expenses per day)
   const chartData = useMemo(() => {
-    const tx = data?.recentTransactions ?? [];
-    const byDate = new Map<string, number>();
-
-    for (const d of last7Days) byDate.set(d, 0);
-
-    tx.forEach((t) => {
-      if (t.type !== 'EXPENSE') return;
-      const day = new Date(t.occurred_at).toISOString().split('T')[0];
-      if (!byDate.has(day)) return;
-      byDate.set(day, (byDate.get(day) || 0) + Number(t.amount || 0));
-    });
-
-    return last7Days.map((date) => ({ date, amount: byDate.get(date) || 0 }));
-  }, [data, last7Days]);
+    const fallback = [
+      { day: 'Lun', amount: 0 },
+      { day: 'Mar', amount: 0 },
+      { day: 'Mie', amount: 0 },
+      { day: 'Jue', amount: 0 },
+      { day: 'Vie', amount: 0 },
+      { day: 'Sab', amount: 0 },
+      { day: 'Dom', amount: 0 },
+    ];
+    const week = data?.weekly_spending;
+    return Array.isArray(week) && week.length === 7 ? week : fallback;
+  }, [data]);
+  const weeklyTotalExpenses = toNumber(data?.weekly_total_expenses);
 
   const recentTransactions = useMemo(() => {
     const tx = data?.recentTransactions ?? [];
@@ -127,10 +169,10 @@ export function Dashboard() {
   }, [data]);
 
   const cards = data?.cards ?? [];
+  const creditCards = cards.filter((c) => toNumber(c.credit_limit) > 0);
 
-  // Nota: tu DB no trae "usedAmount" por card; aquí solo mostramos límites.
-  const totalCreditLimit = cards.reduce((sum, c) => sum + Number(c.credit_limit || 0), 0);
-  const totalCreditUsed = 0; // si no tienes este cálculo en backend aún
+  const totalCreditLimit = creditCards.reduce((sum, c) => sum + toNumber(c.credit_limit), 0);
+  const totalCreditUsed = creditCards.reduce((sum, c) => sum + toNumber(c.used_amount), 0);
   const creditUsagePercent = totalCreditLimit > 0 ? (totalCreditUsed / totalCreditLimit) * 100 : 0;
 
   if (loading) {
@@ -188,21 +230,25 @@ export function Dashboard() {
         {/* Spending Overview */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-semibold text-[#1F2933] mb-4">Spending This Week</h3>
-          <ResponsiveContainer width="100%" height={120}>
-            <BarChart data={chartData}>
-              <XAxis dataKey="date" hide />
-              <Bar dataKey="amount" fill="#2DD4BF" radius={[8, 8, 0, 0]} />
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={chartData} margin={{ top: 24, right: 8, left: 8, bottom: 0 }}>
+              <XAxis
+                dataKey="day"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#64748B', fontSize: 12 }}
+              />
+              <Bar dataKey="amount" fill="#2DD4BF" radius={[8, 8, 0, 0]}>
+                <LabelList
+                  dataKey="amount"
+                  content={renderBarAmountLabel}
+                />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
           <div className="mt-4 flex items-center justify-between">
-            <span className="text-sm text-[#64748B]">Usage vs income</span>
-            <span className="text-sm font-semibold text-[#1F2933]">{usagePercentage.toFixed(0)}%</span>
-          </div>
-          <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[#2DD4BF] rounded-full transition-all"
-              style={{ width: `${Math.min(usagePercentage, 100)}%` }}
-            />
+            <span className="text-sm text-[#64748B]">Total spent</span>
+            <span className="text-sm font-semibold text-[#1F2933]">${formatMoney(weeklyTotalExpenses)}</span>
           </div>
         </div>
 
@@ -230,10 +276,10 @@ export function Dashboard() {
             />
           </div>
           <div className="flex gap-2">
-            {cards.slice(0, 3).map((card) => (
+            {creditCards.slice(0, 3).map((card) => (
               <div
                 key={card.id}
-                className="flex-1 h-16 rounded-xl bg-gradient-to-br from-[#2DD4BF] to-[#14B8A6] p-3 flex flex-col justify-between"
+                className={`flex-1 h-16 rounded-xl bg-gradient-to-br ${cardColorToGradient(card.color)} p-3 flex flex-col justify-between`}
               >
                 <span className="text-xs text-white/80">•••• {card.last4 ?? '----'}</span>
               </div>

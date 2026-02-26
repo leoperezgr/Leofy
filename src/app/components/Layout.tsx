@@ -2,6 +2,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Receipt, CreditCard, BarChart3, Settings, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AddTransactionModal } from './AddTransactionModal';
+import '../../styles/components/Layout.css';
 
 export function Layout() {
   const location = useLocation();
@@ -43,39 +44,39 @@ export function Layout() {
   const navItems = [
     { path: '/', icon: Home, label: 'Home' },
     { path: '/transactions', icon: Receipt, label: 'Transactions' },
-    { path: '/cards', icon: CreditCard, label: 'Cards' },
+    { path: '/cards', icon: CreditCard, label: 'Credit Cards' },
     { path: '/statistics', icon: BarChart3, label: 'Stats' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row">
+    <div className="layout-root">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-white border-r border-gray-200">
-        <div className="p-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#2DD4BF] to-[#14B8A6] flex items-center justify-center">
-              <span className="text-white text-xl font-semibold">L</span>
+      <aside className="layout-sidebar">
+        <div className="layout-sidebar-header">
+          <div className="layout-brand">
+            <div className="layout-brand-badge">
+              <span className="layout-brand-letter">L</span>
             </div>
-            <span className="text-2xl font-semibold text-[#1F2933]">Leofy</span>
+            <span className="layout-brand-name">Leofy</span>
           </div>
         </div>
 
-        <nav className="flex-1 px-4 space-y-1">
+        <nav className="layout-nav">
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                className={`layout-nav-link ${
                   isActive(item.path)
-                    ? 'bg-[#2DD4BF] text-white'
-                    : 'text-[#64748B] hover:bg-[#F8FAFC]'
+                    ? 'layout-nav-link-active'
+                    : 'layout-nav-link-inactive'
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                <span className="font-medium">{item.label}</span>
+                <Icon className="layout-nav-icon" />
+                <span className="layout-nav-label">{item.label}</span>
               </Link>
             );
           })}
@@ -83,10 +84,10 @@ export function Layout() {
           {/* Add Transaction Button debajo de los nav items */}
           <button
             onClick={() => setShowAddTransaction(true)}
-            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#2DD4BF] text-white rounded-xl hover:bg-[#14B8A6] transition-colors"
+            className="layout-add-btn"
           >
-            <Plus className="w-5 h-5" />
-            <span className="font-medium">Add Transaction</span>
+            <Plus className="layout-add-btn-icon" />
+            <span className="layout-add-btn-text">Add Transaction</span>
           </button>
         </nav>
 
@@ -94,27 +95,27 @@ export function Layout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto pb-20 lg:pb-0">
+      <main className="layout-main">
         <Outlet />
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
-        <div className="flex items-center justify-around px-2 py-2">
+      <nav className="layout-mobile-nav">
+        <div className="layout-mobile-nav-inner">
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+                className={`layout-mobile-link ${
                   isActive(item.path)
-                    ? 'text-[#2DD4BF]'
-                    : 'text-[#64748B]'
+                    ? 'layout-mobile-link-active'
+                    : 'layout-mobile-link-inactive'
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                <span className="text-xs">{item.label}</span>
+                <Icon className="layout-mobile-icon" />
+                <span className="layout-mobile-label">{item.label}</span>
               </Link>
             );
           })}
@@ -124,9 +125,9 @@ export function Layout() {
       {/* Floating Action Button - Mobile */}
       <button
         onClick={() => setShowAddTransaction(true)}
-        className="lg:hidden fixed bottom-20 right-4 w-14 h-14 bg-[#2DD4BF] rounded-full shadow-lg flex items-center justify-center text-white hover:bg-[#14B8A6] transition-colors z-40"
+        className="layout-mobile-fab"
       >
-        <Plus className="w-6 h-6" />
+        <Plus className="layout-mobile-fab-icon" />
       </button>
 
       {/* Add Transaction Modal */}
