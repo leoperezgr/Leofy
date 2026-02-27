@@ -1,9 +1,10 @@
-import { Link } from 'react-router-dom';
+﻿import { Link } from 'react-router-dom';
 import { ArrowUpRight, ArrowDownRight, Wallet, DollarSign } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { UiTransaction, normalizeTransactions } from '../utils/transactionsMapper';
 import { BarChart, Bar, XAxis, ResponsiveContainer, LabelList } from 'recharts';
 import { formatMoney } from '../utils/formatMoney';
+import { LoadingScreen } from './LoadingScreen';
 import '../../styles/components/Dashboard.css';
 
 type DashboardData = {
@@ -138,7 +139,7 @@ export function Dashboard() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
-      const text = await res.text(); // 👈 lee aunque no sea JSON
+      const text = await res.text(); // ðŸ‘ˆ lee aunque no sea JSON
       let json: any = null;
       try {
         json = text ? JSON.parse(text) : null;
@@ -233,16 +234,11 @@ export function Dashboard() {
   }, [transactions, debitCardIds]);
 
   if (loading) {
-    // sin romper estilos: mismo contenedor, solo placeholder
     return (
-      <div className="dashboard-page max-w-7xl mx-auto p-4 lg:p-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold text-[#1F2933] mb-2">
-            {userName ? `Welcome, ${userName}` : 'Welcome'}
-          </h1>
-          <p className="text-[#64748B]">Loading…</p>
-        </div>
-      </div>
+      <LoadingScreen
+        title={userName ? `Welcome, ${userName}` : 'Dashboard'}
+        message="Loading your financial overview..."
+      />
     );
   }
 
@@ -355,7 +351,7 @@ export function Dashboard() {
                 key={card.id}
                 className={`flex-1 h-16 rounded-xl bg-gradient-to-br ${cardColorToGradient(card.color)} p-3 flex flex-col justify-between`}
               >
-                <span className="text-xs text-white/80">•••• {card.last4 ?? '----'}</span>
+                <span className="text-xs text-white/80">{"\u2022\u2022\u2022\u2022"} {card.last4 ?? '----'}</span>
               </div>
             ))}
           </div>
@@ -386,7 +382,7 @@ export function Dashboard() {
                   )}
                 </div>
                 <div>
-                  <p className="font-medium text-[#1F2933]">{t.description ?? '—'}</p>
+                  <p className="font-medium text-[#1F2933]">{t.description ?? "\u2014"}</p>
                   <p className="text-sm text-[#64748B]">
                     {t.category || 'Uncategorized'}
                   </p>
@@ -406,4 +402,5 @@ export function Dashboard() {
     </div>
   );
 }
+
 

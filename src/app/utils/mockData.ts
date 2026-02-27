@@ -170,8 +170,14 @@ export const transactions: Transaction[] = [
 ];
 
 export const getCategoryIcon = (categoryName: string): string => {
-  const category = categories.find(cat => cat.name === categoryName);
-  return category?.icon || 'Circle';
+  const normalized = String(categoryName || "").trim().toLowerCase();
+
+  if (["transfer", "transfers", "transferencia", "transferencias"].includes(normalized)) {
+    return "ArrowLeftRight";
+  }
+
+  const category = categories.find((cat) => cat.name.toLowerCase() === normalized);
+  return category?.icon || "Circle";
 };
 
 export const getCardById = (cardId: string): CreditCard | undefined => {

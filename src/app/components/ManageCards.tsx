@@ -1,7 +1,8 @@
-// src/components/ManageCards.tsx
+﻿// src/components/ManageCards.tsx
 import { useEffect, useMemo, useState } from "react";
 import { CreditCard, Plus, Pencil, Trash2, X } from "lucide-react";
 import { formatMoney } from "../utils/formatMoney";
+import { LoadingScreen } from "./LoadingScreen";
 import visaLogo from "../../assets/brands/visa.svg";
 import mastercardLogo from "../../assets/brands/mastercard.svg";
 import amexLogo from "../../assets/brands/amex.svg";
@@ -26,7 +27,7 @@ type Card = {
   brand?: string | null;
   credit_limit?: number | string | null;
 
-  // ✅ nuevos
+  // nuevos
   color?: CardColor | string | null;
   closing_day?: number | null;
   due_day?: number | null;
@@ -94,7 +95,7 @@ export function ManageCards() {
   const [kind, setKind] = useState<"credit" | "debit">("debit"); // UI only
   const [limit, setLimit] = useState(""); // string for input
 
-  // ✅ nuevos
+  // nuevos
   const [color, setColor] = useState<CardColor>("OTHER");
   const [closingDay, setClosingDay] = useState(""); // "1".."31" o ""
   const [dueDay, setDueDay] = useState(""); // "1".."31" o ""
@@ -285,6 +286,15 @@ export function ManageCards() {
     }
   }
 
+  if (loading) {
+    return (
+      <LoadingScreen
+        title="Manage Cards"
+        message="Loading your cards..."
+      />
+    );
+  }
+
   return (
     <div className="manage-cards-page max-w-7xl mx-auto p-4 lg:p-8">
       {/* Header */}
@@ -359,11 +369,7 @@ export function ManageCards() {
 
       {/* List */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {loading ? (
-          <div className="p-6">
-            <p className="text-sm text-[#64748B]">Loading cards…</p>
-          </div>
-        ) : filtered.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="p-6">
             <p className="text-sm text-[#64748B]">No cards found.</p>
           </div>
@@ -388,9 +394,9 @@ export function ManageCards() {
                   <div className="min-w-0">
                     <p className="font-medium text-[#1F2933] truncate">{card.name}</p>
                     <p className="text-sm text-[#64748B]">
-                      {credit ? "Credit" : "Debit"} {card.last4 ? `• •••• ${card.last4}` : ""}
-                      {credit && card.closing_day ? ` • Cut: ${card.closing_day}` : ""}
-                      {credit && card.due_day ? ` • Pay: ${card.due_day}` : ""}
+                      {credit ? "Credit" : "Debit"} {card.last4 ? `\u2022 \u2022\u2022\u2022\u2022 ${card.last4}` : ""}
+                      {credit && card.closing_day ? ` \u2022 Cut: ${card.closing_day}` : ""}
+                      {credit && card.due_day ? ` \u2022 Pay: ${card.due_day}` : ""}
                     </p>
                   </div>
                 </div>
@@ -404,7 +410,7 @@ export function ManageCards() {
                   ) : (
                     <>
                       <p className="text-sm text-[#64748B]">Account</p>
-                      <p className="font-semibold text-[#1F2933]">—</p>
+                      <p className="font-semibold text-[#1F2933]">{"\u2014"}</p>
                     </>
                   )}
                 </div>
@@ -462,7 +468,7 @@ export function ManageCards() {
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold truncate max-w-[70%]">{name || "Card name"}</p>
-                  <p className="text-sm font-mono">•••• {last4 || "----"}</p>
+                  <p className="text-sm font-mono">{"\u2022\u2022\u2022\u2022"} {last4 || "----"}</p>
                 </div>
               </div>
             </div>
@@ -615,7 +621,7 @@ export function ManageCards() {
                       onChange={(e) => {
                         const raw = e.target.value.replace(/,/g, "");
 
-                        // Solo números y decimal
+                        // Solo numeros y decimal
                         if (!/^\d*\.?\d*$/.test(raw)) return;
 
                         setLimit(raw);
@@ -625,7 +631,7 @@ export function ManageCards() {
                     />
                     </div>
                     <p className="text-xs text-[#94A3B8] mt-2">
-                      Tip: you can type “50000” (formatting is applied in display, not saved).
+                      Tip: you can type "50000" (formatting is applied in display, not saved).
                     </p>
                   </div>
 
@@ -660,7 +666,7 @@ export function ManageCards() {
                 disabled={saving}
                 className="w-full py-4 bg-[#2DD4BF] text-white font-semibold rounded-xl hover:bg-[#14B8A6] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {saving ? "Saving…" : editing ? "Save Changes" : "Add Card"}
+                {saving ? "Saving..." : editing ? "Save Changes" : "Add Card"}
               </button>
             </form>
           </div>
@@ -669,3 +675,4 @@ export function ManageCards() {
     </div>
   );
 }
+

@@ -1,7 +1,8 @@
-import { Link } from "react-router-dom";
+﻿import { Link } from "react-router-dom";
 import { ArrowRight, AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { formatMoney } from "../utils/formatMoney";
+import { LoadingScreen } from "./LoadingScreen";
 import "../../styles/components/CreditCards.css";
 
 type ApiCard = {
@@ -180,6 +181,15 @@ export function DebitCards() {
     return { totalBalance, cardsCount };
   }, [uiCards]);
 
+  if (loading) {
+    return (
+      <LoadingScreen
+        title="Debit Cards"
+        message="Loading your cards..."
+      />
+    );
+  }
+
   return (
     <div className="cc-page">
       <div className="cc-header">
@@ -207,11 +217,7 @@ export function DebitCards() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="cc-content-box">
-          <p className="cc-muted-text">Loading cards…</p>
-        </div>
-      ) : uiCards.length === 0 ? (
+      {uiCards.length === 0 ? (
         <div className="cc-content-box">
           <p className="cc-muted-text">No debit cards found.</p>
           <p className="cc-tip-text">Tip: add a card without a credit limit in Manage Cards.</p>
@@ -237,7 +243,7 @@ export function DebitCards() {
                       <h3 className="cc-card-name">{card.name}</h3>
                     </div>
                     <div>
-                      <p className="cc-card-last4">•••• •••• •••• {card.last4}</p>
+                      <p className="cc-card-last4">{"\u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022"} {card.last4}</p>
                     </div>
                   </div>
                 </div>
@@ -281,3 +287,4 @@ export function DebitCards() {
     </div>
   );
 }
+

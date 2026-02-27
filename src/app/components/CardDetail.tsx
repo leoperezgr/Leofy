@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "rec
 import * as LucideIcons from "lucide-react";
 import { formatMoney } from "../utils/formatMoney";
 import { getCategoryIcon } from "../utils/mockData"; // si ya tienes un mapper real, lo cambiamos luego
+import { LoadingScreen } from "./LoadingScreen";
 import "../../styles/components/CardDetail.css";
 
 type ApiCard = {
@@ -243,12 +244,10 @@ export function CardDetail() {
 
   if (loading) {
     return (
-      <div className="cd-page">
-        <div className="cd-header">
-          <h1 className="cd-title">Card Details</h1>
-          <p className="cd-subtitle">Loadingâ€¦</p>
-        </div>
-      </div>
+      <LoadingScreen
+        title="Card Details"
+        message="Loading card movements..."
+      />
     );
   }
 
