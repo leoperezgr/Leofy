@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { categories } from '../utils/mockData';
 import * as LucideIcons from 'lucide-react';
+import { formatMoney } from '../utils/formatMoney';
 import '../../styles/components/AddTransactionModal.css';
 
 interface AddTransactionModalProps {
@@ -19,11 +20,14 @@ type Card = {
 
 export function AddTransactionModal({ open, onClose }: AddTransactionModalProps) {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+  const INSTALLMENT_OPTIONS = [3, 6, 9, 12, 18] as const;
 
   const [type, setType] = useState<'income' | 'expense' | 'transfer'>('expense');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'debit' | 'credit'>('credit');
+  const [purchaseType, setPurchaseType] = useState<'one_time' | 'installments'>('one_time');
+  const [installmentMonths, setInstallmentMonths] = useState<number>(12);
   const [cardId, setCardId] = useState(''); // credit card selection OR transfer fromCardId
   const [toCardId, setToCardId] = useState(''); // transfer toCardId
   const [description, setDescription] = useState('');
@@ -72,6 +76,8 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
     setAmount(cleaned);
   };
 
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+
   const authHeaders = (): Headers => {
     const token = localStorage.getItem('leofy_token');
     const h = new Headers();
@@ -104,6 +110,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
   useEffect(() => {
   if (type === "transfer") {
     setPaymentMethod("debit"); // o "cash", da igual porque no se muestra
+    setPurchaseType('one_time');
     setCardId("");
     setToCardId("");
     return;
@@ -111,14 +118,31 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
 
   if (type === "income") {
     setPaymentMethod("debit");
+    setPurchaseType('one_time');
     setCardId("");
     return;
   }
 
   // expense default a credit
   setPaymentMethod("credit");
+  setPurchaseType('one_time');
   setCardId("");
 }, [type]);
+
+  useEffect(() => {
+    if (type !== 'expense' || paymentMethod !== 'credit') {
+      setPurchaseType('one_time');
+    }
+  }, [type, paymentMethod]);
+
+  const amountNumPreview = Number(amount);
+  const validAmountPreview = Number.isFinite(amountNumPreview) && amountNumPreview > 0 ? amountNumPreview : 0;
+  const monthlyPreview =
+    purchaseType === 'installments' && installmentMonths > 0
+      ? round2(validAmountPreview / installmentMonths)
+      : 0;
+
+  const shouldShowPurchaseType = type === 'expense' && paymentMethod === 'credit';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,6 +206,8 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
         setCustomCategory('');
         setDescription('');
         setPaymentMethod('credit');
+        setPurchaseType('one_time');
+        setInstallmentMonths(12);
         setCardId('');
         setToCardId('');
         return;
@@ -205,7 +231,18 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
         description: desc || finalCategory,
         date: new Date().toISOString(),
         card_id: paymentMethod === 'cash' ? null : cardId || null,
-        // Note: backend might strip paymentMethod/cardId today depending on Zod schema
+        paymentMethod,
+        metadata: {
+          paymentMethod,
+          ...(purchaseType === 'installments'
+            ? {
+                installments: {
+                  months: installmentMonths,
+                  monthlyAmount: round2(amountNum / installmentMonths),
+                },
+              }
+            : {}),
+        },
       };
 
       const res = await fetch(`${API_BASE}/api/transactions`, {
@@ -226,6 +263,8 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
       setCustomCategory('');
       setDescription('');
       setPaymentMethod('credit');
+      setPurchaseType('one_time');
+      setInstallmentMonths(12);
       setCardId('');
       setToCardId('');
     } catch (err: any) {
@@ -312,6 +351,18 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
                 className="atm-amount-input"
               />
             </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="atm-label">Description</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={type === 'transfer' ? 'e.g., Transfer to Savings' : 'e.g., Grocery shopping'}
+              className="atm-text-input"
+            />
           </div>
 
           {/* Transfer accounts */}
@@ -478,17 +529,53 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
             </div>
           )}
 
-          {/* Description */}
-          <div>
-            <label className="atm-label">Description</label>
-            <input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={type === 'transfer' ? 'e.g., Transfer to Savings' : 'e.g., Grocery shopping'}
-              className="atm-text-input"
-            />
-          </div>
+          {/* Purchase Type (only expense + credit) */}
+          {shouldShowPurchaseType && (
+            <div>
+              <label className="atm-label category-label">Purchase Type</label>
+              <div className="atm-method-grid">
+                <button
+                  type="button"
+                  onClick={() => setPurchaseType('one_time')}
+                  className={`atm-method-button ${
+                    purchaseType === 'one_time' ? 'atm-method-button-active' : 'atm-method-button-inactive'
+                  }`}
+                >
+                  Contado
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPurchaseType('installments')}
+                  className={`atm-method-button ${
+                    purchaseType === 'installments' ? 'atm-method-button-active' : 'atm-method-button-inactive'
+                  }`}
+                >
+                  Meses
+                </button>
+              </div>
+            </div>
+          )}
+
+          {shouldShowPurchaseType && purchaseType === 'installments' && (
+            <div>
+              <label className="atm-label category-label">Installments</label>
+              <div className="atm-method-grid">
+                {INSTALLMENT_OPTIONS.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setInstallmentMonths(m)}
+                    className={`atm-method-button ${
+                      installmentMonths === m ? 'atm-method-button-active' : 'atm-method-button-inactive'
+                    }`}
+                  >
+                    {m} months
+                  </button>
+                ))}
+              </div>
+              <p className="atm-loading-text">Monthly: ${formatMoney(monthlyPreview)}</p>
+            </div>
+          )}
 
           {/* Submit Button */}
           <button

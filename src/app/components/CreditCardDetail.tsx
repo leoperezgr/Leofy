@@ -12,6 +12,8 @@ type ApiCard = {
   name: string;
   last4: string | null;
   credit_limit: number | string | null;
+  closing_day?: number | string | null;
+  due_day?: number | string | null;
   color?: string | null;
 };
 
@@ -32,9 +34,15 @@ type ApiTx = {
   category_id?: string | number | null;
   categoryId?: string | number | null;
   card_id?: string | number | null;
+  cardId?: string | number | null;
   metadata?: {
     category_name?: string | null;
     categoryName?: string | null;
+    installments?: {
+      months?: number | string;
+      monthlyAmount?: number | string;
+      startAt?: string;
+    } | null;
   } | null;
 };
 
@@ -44,6 +52,30 @@ function toId(v: string | number) {
 function toNumber(v: any) {
   const n = typeof v === "string" ? Number(v) : Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+function startOfDay(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function safeDayInMonth(year: number, monthIndex0: number, day: number) {
+  const lastDay = new Date(year, monthIndex0 + 1, 0).getDate();
+  const safeDay = Math.min(Math.max(1, Math.trunc(day)), lastDay);
+  return new Date(year, monthIndex0, safeDay);
+}
+
+function addMonths(date: Date, n: number) {
+  const firstTargetMonth = new Date(date.getFullYear(), date.getMonth() + n, 1);
+  return safeDayInMonth(firstTargetMonth.getFullYear(), firstTargetMonth.getMonth(), date.getDate());
+}
+
+function diffMonths(a: Date, b: Date) {
+  return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+}
+
+function isBetweenInclusive(date: Date, start: Date, end: Date) {
+  const x = startOfDay(date).getTime();
+  return x >= startOfDay(start).getTime() && x <= startOfDay(end).getTime();
 }
 
 function colorToGradient(color?: string | null) {
@@ -71,7 +103,7 @@ function colorToGradient(color?: string | null) {
   }
 }
 
-export function CardDetail() {
+export function CreditCardDetail() {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
   const { cardId } = useParams<{ cardId: string }>();
 
@@ -99,16 +131,11 @@ export function CardDetail() {
 
         const h = authHeaders();
 
-        // 1) cargar cards y encontrar la tarjeta (porque tu backend actual solo tiene GET /api/cards)
-        const resCards = await fetch(`${API_BASE}/api/cards`, { headers: h });
-        const cardsJson = await resCards.json().catch(() => null);
-        if (!resCards.ok) throw new Error(cardsJson?.error || cardsJson?.message || "Failed to load cards");
-
-        const found = (Array.isArray(cardsJson) ? cardsJson : []).find(
-          (c: any) => toId(c.id) === String(cardId)
-        );
-
-        if (!found) {
+        // 1) cargar tarjeta por id
+        const resCard = await fetch(`${API_BASE}/api/cards/${cardId}`, { headers: h });
+        const cardJson = await resCard.json().catch(() => null);
+        if (!resCard.ok) throw new Error(cardJson?.error || cardJson?.message || "Failed to load card");
+        if (!cardJson) {
           if (!cancelled) setCard(null);
           return;
         }
@@ -132,7 +159,7 @@ export function CardDetail() {
 
         if (cancelled) return;
 
-        setCard(found);
+        setCard(cardJson);
         setTx(Array.isArray(txJson) ? txJson : []);
         setCategories(categoriesJson);
       } catch (e: any) {
@@ -155,6 +182,9 @@ export function CardDetail() {
   }, [API_BASE, cardId]);
 
   const creditLimit = useMemo(() => toNumber(card?.credit_limit), [card]);
+  const isCredit = creditLimit > 0;
+  const closingDay = useMemo(() => Math.trunc(toNumber((card as any)?.closing_day)), [card]);
+  const dueDay = useMemo(() => Math.trunc(toNumber((card as any)?.due_day)), [card]);
   const categoryById = useMemo(
     () => new Map(categories.map((c) => [toId(c.id), c])),
     [categories]
@@ -220,6 +250,70 @@ export function CardDetail() {
   const usagePercent = creditLimit > 0 ? (usedAmount / creditLimit) * 100 : 0;
   const isHighUsage = usagePercent > 80;
 
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const nextClosingDate = useMemo(() => {
+    if (!isCredit || closingDay <= 0) return null;
+    const candidate = safeDayInMonth(today.getFullYear(), today.getMonth(), closingDay);
+    if (today.getTime() <= candidate.getTime()) return candidate;
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    return safeDayInMonth(nextMonth.getFullYear(), nextMonth.getMonth(), closingDay);
+  }, [isCredit, closingDay, today]);
+
+  const nextDueDate = useMemo(() => {
+    if (!isCredit || dueDay <= 0 || !nextClosingDate) return null;
+    const candidate = safeDayInMonth(nextClosingDate.getFullYear(), nextClosingDate.getMonth(), dueDay);
+    if (candidate.getTime() > nextClosingDate.getTime()) return candidate;
+    const nextMonth = new Date(nextClosingDate.getFullYear(), nextClosingDate.getMonth() + 1, 1);
+    return safeDayInMonth(nextMonth.getFullYear(), nextMonth.getMonth(), dueDay);
+  }, [isCredit, dueDay, nextClosingDate]);
+
+  const cycleEnd = useMemo(() => (nextClosingDate ? startOfDay(nextClosingDate) : null), [nextClosingDate]);
+  const cycleStart = useMemo(() => {
+    if (!cycleEnd) return null;
+    const prevClosing = addMonths(cycleEnd, -1);
+    const nextDay = new Date(prevClosing.getFullYear(), prevClosing.getMonth(), prevClosing.getDate() + 1);
+    return startOfDay(nextDay);
+  }, [cycleEnd]);
+
+  const amountDueCycle = useMemo(() => {
+    if (!cardId || !isCredit || !cycleStart || !cycleEnd) return 0;
+
+    return tx.reduce((sum, t) => {
+      const type = String((t as any).type || "").toUpperCase();
+      if (type !== "EXPENSE") return sum;
+
+      const cid = (t as any).card_id ?? (t as any).cardId ?? null;
+      if (!cid || toId(cid) !== String(cardId)) return sum;
+
+      const amount = toNumber((t as any).amount);
+      const installments = (t as any)?.metadata?.installments;
+      if (installments && typeof installments === "object") {
+        const months = Math.trunc(toNumber((installments as any).months));
+        if (months < 2 || months > 60) return sum;
+
+        const monthlyAmount =
+          (installments as any).monthlyAmount !== undefined
+            ? toNumber((installments as any).monthlyAmount)
+            : toNumber(Number((amount / months).toFixed(2)));
+        if (monthlyAmount <= 0) return sum;
+
+        const startAtRaw = (installments as any).startAt || (t as any).occurred_at;
+        const startAtDate = new Date(startAtRaw);
+        if (Number.isNaN(startAtDate.getTime())) return sum;
+
+        const monthsElapsed = diffMonths(startOfDay(startAtDate), cycleEnd);
+        if (monthsElapsed >= 0 && monthsElapsed < months) {
+          return sum + monthlyAmount;
+        }
+        return sum;
+      }
+
+      const occurredAt = new Date((t as any).occurred_at);
+      if (Number.isNaN(occurredAt.getTime())) return sum;
+      return isBetweenInclusive(occurredAt, cycleStart, cycleEnd) ? sum + amount : sum;
+    }, 0);
+  }, [tx, cardId, isCredit, cycleStart, cycleEnd]);
+
   const last30Days = useMemo(() => {
     const days = Array.from({ length: 30 }, (_, i) => {
       const date = new Date();
@@ -283,6 +377,19 @@ export function CardDetail() {
     );
   }
 
+  if (!isCredit) {
+    return (
+      <div className="cd-page">
+        <div className="cd-not-found">
+          <p className="cd-subtitle">This card is not a credit card.</p>
+          <Link to="/cards" className="cd-not-found-link">
+            Back to Cards
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const gradient = colorToGradient(card.color);
   const available = Math.max(0, creditLimit - usedAmount);
 
@@ -316,6 +423,40 @@ export function CardDetail() {
       </div>
 
       {/* Usage Stats */}
+      {isCredit && (
+        <div className="cd-box cd-box-spacing">
+          <div className="cd-stats-grid">
+            <div>
+              <p className="cd-label">Closing date</p>
+              <p className="cd-stat-value">Every {closingDay || "--"}</p>
+              <p className="cd-subtitle">
+                {nextClosingDate
+                  ? nextClosingDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                  : "Not set"}
+              </p>
+            </div>
+            <div>
+              <p className="cd-label">Payment due</p>
+              <p className="cd-stat-value">Every {dueDay || "--"}</p>
+              <p className="cd-subtitle">
+                {nextDueDate
+                  ? nextDueDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                  : "Not set"}
+              </p>
+            </div>
+            <div>
+              <p className="cd-label">Amount due this cycle</p>
+              <p className="cd-stat-value">${formatMoney(amountDueCycle)}</p>
+              <p className="cd-subtitle">
+                {cycleStart && cycleEnd
+                  ? `${cycleStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${cycleEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                  : "Current cycle"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="cd-box cd-box-spacing">
         <div className="cd-stats-grid">
           <div>

@@ -45,6 +45,7 @@ export function Layout() {
     { path: '/', icon: Home, label: 'Home' },
     { path: '/transactions', icon: Receipt, label: 'Transactions' },
     { path: '/cards', icon: CreditCard, label: 'Credit Cards' },
+    { path: '/debit-cards', icon: CreditCard, label: 'Debit Cards' },
     { path: '/statistics', icon: BarChart3, label: 'Stats' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];
