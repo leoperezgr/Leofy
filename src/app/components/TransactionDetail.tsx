@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { categories } from "../utils/mockData";
@@ -44,6 +44,11 @@ export function TransactionDetail() {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
   const { transactionId } = useParams<{ transactionId: string }>();
   const nav = useNavigate();
+  const location = useLocation();
+  const routeState = (location.state as {
+    paymentMethod?: "cash" | "debit" | "credit";
+    cardId?: string | null;
+  } | null) ?? null;
 
   const token = useMemo(() => localStorage.getItem("leofy_token") || "", []);
   const authHeaders = useMemo(() => {
@@ -59,12 +64,21 @@ export function TransactionDetail() {
   const [tx, setTx] = useState<UiTransaction | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
   const [cardsLoading, setCardsLoading] = useState(false);
+  const [cardsLoaded, setCardsLoaded] = useState(false);
+  const [rawTx, setRawTx] = useState<any | null>(null);
+  const [didInitPaymentSelection, setDidInitPaymentSelection] = useState(false);
+  const [userTouchedPaymentMethod, setUserTouchedPaymentMethod] = useState(false);
 
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [customCategory, setCustomCategory] = useState("");
-  const [cardId, setCardId] = useState<string>("");
+  const [cardId, setCardId] = useState<string>(routeState?.cardId ? String(routeState.cardId) : "");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "debit" | "credit">(
+    routeState?.paymentMethod === "credit" || routeState?.paymentMethod === "debit" || routeState?.paymentMethod === "cash"
+      ? routeState.paymentMethod
+      : "cash"
+  );
 
   const filteredCategories = useMemo(() => {
     const t = tx?.type === "income" ? "income" : "expense";
@@ -72,10 +86,11 @@ export function TransactionDetail() {
   }, [tx?.type]);
 
   const creditCardsOnly = useMemo(() => {
-    return cards.filter((c) => {
-      const n = Number((c as any).credit_limit ?? 0);
-      return Number.isFinite(n) && n > 0;
-    });
+    return cards.filter((c) => c.credit_limit !== null && c.credit_limit !== undefined);
+  }, [cards]);
+
+  const debitCardsOnly = useMemo(() => {
+    return cards.filter((c) => c.credit_limit === null || c.credit_limit === undefined);
   }, [cards]);
 
   const getIconComponent = (iconName: string) => {
@@ -95,6 +110,7 @@ export function TransactionDetail() {
       setCards([]);
     } finally {
       setCardsLoading(false);
+      setCardsLoaded(true);
     }
   }
 
@@ -107,40 +123,38 @@ export function TransactionDetail() {
 
       const h = new Headers(authHeaders);
       h.set("Content-Type", "application/json");
-
-      let direct: any = null;
-      try {
-        const res = await fetch(`${API_BASE}/api/transactions/${transactionId}`, { headers: h });
-        const data = await res.json().catch(() => null);
-        if (res.ok) direct = data;
-      } catch {
-      }
+      setDidInitPaymentSelection(false);
+      setUserTouchedPaymentMethod(false);
 
       let foundUi: UiTransaction | null = null;
-
-      if (direct) {
-        const normalized = normalizeTransactions([direct] as any);
-        foundUi = normalized?.[0] ?? null;
-      } else {
-        const res = await fetch(`${API_BASE}/api/transactions`, { headers: h });
-        const data = await res.json().catch(() => null);
-        if (!res.ok) throw new Error(data?.error || data?.message || "Failed to load transaction");
-        const normalized: UiTransaction[] = normalizeTransactions(data);
-        foundUi = normalized.find((t) => String(t.id) === String(transactionId)) ?? null;
-      }
+      let foundRaw: any = null;
+      const res = await fetch(`${API_BASE}/api/transactions`, { headers: h });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || data?.message || "Failed to load transaction");
+      const rawList: any[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.transactions)
+          ? data.transactions
+          : Array.isArray(data?.recentTransactions)
+            ? data.recentTransactions
+            : [];
+      foundRaw = rawList.find((t) => String(t?.id) === String(transactionId)) ?? null;
+      const normalized: UiTransaction[] = normalizeTransactions(data);
+      foundUi = normalized.find((t) => String(t.id) === String(transactionId)) ?? null;
 
       if (!foundUi) {
         setTx(null);
+        setRawTx(null);
         setError("Transaction not found.");
         return;
       }
 
       setTx(foundUi);
+      setRawTx(foundRaw ?? null);
       setAmount(String(foundUi.amount ?? ""));
       setDescription(foundUi.description ?? "");
       setCategory(foundUi.category ?? "");
       setCustomCategory("");
-      setCardId((foundUi as any).cardId ? String((foundUi as any).cardId) : "");
     } catch (e: any) {
       setError(e?.message || "Error loading transaction");
       setTx(null);
@@ -158,6 +172,46 @@ export function TransactionDetail() {
     loadTransaction();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [API_BASE, transactionId]);
+
+  useEffect(() => {
+    if (didInitPaymentSelection || userTouchedPaymentMethod) return;
+    if (!rawTx || !cardsLoaded) return;
+
+    const rawCardId = rawTx?.card_id ?? rawTx?.cardId ?? null;
+    const explicit =
+      rawTx?.payment_method ??
+      rawTx?.paymentMethod ??
+      rawTx?.metadata?.payment_method ??
+      rawTx?.metadata?.paymentMethod ??
+      null;
+
+    let inferred: "cash" | "debit" | "credit";
+    if (explicit === "credit" || explicit === "debit" || explicit === "cash") {
+      inferred = explicit;
+    } else if (rawCardId != null) {
+      const hit = cards.find((c) => String(c.id) === String(rawCardId));
+      inferred = hit && hit.credit_limit !== null && hit.credit_limit !== undefined ? "credit" : "debit";
+    } else {
+      inferred = "cash";
+    }
+
+    setPaymentMethod(inferred);
+    setCardId(inferred === "cash" || rawCardId == null ? "" : String(rawCardId));
+    setDidInitPaymentSelection(true);
+  }, [didInitPaymentSelection, userTouchedPaymentMethod, rawTx, cardsLoaded, cards]);
+
+  useEffect(() => {
+    if (paymentMethod === "cash") {
+      if (cardId) setCardId("");
+      return;
+    }
+
+    if (!cardId) return;
+
+    const allowed = paymentMethod === "credit" ? creditCardsOnly : debitCardsOnly;
+    const isValid = allowed.some((c) => String(c.id) === String(cardId));
+    if (!isValid) setCardId("");
+  }, [paymentMethod, cardId, creditCardsOnly, debitCardsOnly]);
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
@@ -185,7 +239,8 @@ export function TransactionDetail() {
         description: desc,
         category: finalCategory,
         date: tx.date ? new Date(tx.date).toISOString() : new Date().toISOString(),
-        card_id: cardId ? Number(cardId) : null,
+        paymentMethod,
+        card_id: paymentMethod === "cash" ? null : cardId || null,
       };
 
       const res = await fetch(`${API_BASE}/api/transactions/${transactionId}`, {
@@ -204,6 +259,11 @@ export function TransactionDetail() {
           setAmount(String(normalized[0].amount ?? ""));
           setDescription(normalized[0].description ?? "");
           setCategory(normalized[0].category ?? "");
+          setPaymentMethod(
+            normalized[0].paymentMethod === "credit" || normalized[0].paymentMethod === "debit"
+              ? normalized[0].paymentMethod
+              : "cash"
+          );
         }
       } catch {
       }
@@ -300,17 +360,40 @@ export function TransactionDetail() {
             </div>
           </div>
 
-          {tx.type === "expense" && tx.paymentMethod === "credit" && (
+          <div>
+            <label className="block text-sm font-medium text-[#64748B] mb-3">Payment Method</label>
+            <div className="grid grid-cols-3 gap-2">
+              {(["credit", "debit", "cash"] as const).map((method) => (
+                <button
+                  key={method}
+                  type="button"
+                  onClick={() => {
+                    setUserTouchedPaymentMethod(true);
+                    setPaymentMethod(method);
+                  }}
+                  className={`py-3 rounded-xl border-2 font-medium transition-all ${
+                    paymentMethod === method
+                      ? "border-[#2DD4BF] bg-[#2DD4BF]/5"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  {method === "credit" ? "Credit" : method === "debit" ? "Debit" : "Cash"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {(paymentMethod === "credit" || paymentMethod === "debit") && (
             <div>
               <label className="block text-sm font-medium text-[#64748B] mb-3">
-                Select Credit Card
+                {paymentMethod === "credit" ? "Select Credit Card" : "Select Debit Account"}
               </label>
 
               {cardsLoading ? (
                 <div className="text-sm text-[#64748B]">Loading cards...</div>
               ) : (
                 <div className="space-y-2">
-                  {creditCardsOnly.map((card) => (
+                  {(paymentMethod === "credit" ? creditCardsOnly : debitCardsOnly).map((card) => (
                     <button
                       key={card.id}
                       type="button"
@@ -323,13 +406,15 @@ export function TransactionDetail() {
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-[#1F2933]">{card.name}</span>
-                        <span className="text-sm text-[#64748B]">•••• {card.last4 ?? "----"}</span>
+                        <span className="text-sm text-[#64748B]">â€¢â€¢â€¢â€¢ {card.last4 ?? "----"}</span>
                       </div>
                     </button>
                   ))}
 
-                  {creditCardsOnly.length === 0 && (
-                    <div className="text-sm text-[#64748B]">No credit cards found.</div>
+                  {(paymentMethod === "credit" ? creditCardsOnly : debitCardsOnly).length === 0 && (
+                    <div className="text-sm text-[#64748B]">
+                      {paymentMethod === "credit" ? "No credit cards found." : "No debit accounts found."}
+                    </div>
                   )}
                 </div>
               )}

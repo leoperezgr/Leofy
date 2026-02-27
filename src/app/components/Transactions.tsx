@@ -8,13 +8,42 @@ import { formatMoney } from "../utils/formatMoney";
 import "../../styles/components/Transactions.css";
 
 type FilterType = "all" | "income" | "expense";
+type UiTransactionRow = UiTransaction & { cardName?: string; cardId?: string };
+
+type PaymentSource = {
+  payment_method?: string | null;
+  paymentMethod?: string | null;
+  card_id?: string | number | null;
+  cardId?: string | number | null;
+  credit_limit?: number | string | null;
+  name?: string | null;
+  metadata?: {
+    payment_method?: string | null;
+    paymentMethod?: string | null;
+  } | null;
+};
+
+const getPaymentMethodFromApi = (tx: PaymentSource | null | undefined, fallback = "") => {
+  const raw =
+    tx?.payment_method ??
+    tx?.paymentMethod ??
+    tx?.metadata?.payment_method ??
+    tx?.metadata?.paymentMethod;
+
+  return raw ? String(raw).toLowerCase() : fallback;
+};
+
+const cardToMethod = (card: PaymentSource | null | undefined) => {
+  const limit = Number(card?.credit_limit ?? 0);
+  return Number.isFinite(limit) && limit > 0 ? "credit" : "debit";
+};
 
 export function Transactions() {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
   const [filter, setFilter] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [items, setItems] = useState<UiTransaction[]>([]);
+  const [items, setItems] = useState<UiTransactionRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const authHeaders = (): Record<string, string> => {
@@ -29,21 +58,65 @@ export function Transactions() {
       try {
         setLoading(true);
 
-        const res = await fetch(`${API_BASE}/api/transactions`, {
-          headers: {
-            ...authHeaders(),
-            "Content-Type": "application/json",
-          },
-        });
+        const headers = {
+          ...authHeaders(),
+          "Content-Type": "application/json",
+        };
+
+        const [res, cardsRes] = await Promise.all([
+          fetch(`${API_BASE}/api/transactions`, { headers }),
+          fetch(`${API_BASE}/api/cards`, { headers }),
+        ]);
 
         const data = await res.json().catch(() => null);
+        const cardsData = await cardsRes.json().catch(() => null);
 
         if (!res.ok) {
           const msg = data?.error || data?.message || `Failed to load transactions (${res.status})`;
           throw new Error(msg);
         }
 
-        const normalized: UiTransaction[] = normalizeTransactions(data);
+        const rawList: any[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.transactions)
+            ? data.transactions
+            : Array.isArray(data?.recentTransactions)
+              ? data.recentTransactions
+              : [];
+
+        const cardsList: any[] = Array.isArray(cardsData) ? cardsData : [];
+        const cardMethodById = new Map<string, string>();
+        const cardNameById = new Map<string, string>();
+        for (const card of cardsList) {
+          if (!card?.id) continue;
+          cardMethodById.set(String(card.id), cardToMethod(card));
+          if (card?.name) cardNameById.set(String(card.id), String(card.name));
+        }
+
+        const paymentById = new Map<string, string>();
+        const cardNameByTxId = new Map<string, string>();
+        const cardIdByTxId = new Map<string, string>();
+        for (const row of rawList) {
+          if (!row?.id) continue;
+          const explicit = getPaymentMethodFromApi(row, "");
+          const cardId = row?.card_id ?? row?.cardId ?? null;
+          const fromCard = cardId != null ? cardMethodById.get(String(cardId)) : null;
+          const method = explicit || fromCard || "cash";
+          if (method) paymentById.set(String(row.id), method);
+          if (cardId != null) {
+            cardIdByTxId.set(String(row.id), String(cardId));
+            const cardName = cardNameById.get(String(cardId));
+            if (cardName) cardNameByTxId.set(String(row.id), cardName);
+          }
+        }
+
+        const normalized: UiTransactionRow[] = normalizeTransactions(data).map((tx) => ({
+          ...tx,
+          paymentMethod: paymentById.get(String(tx.id)) || tx.paymentMethod || "cash",
+          cardName: cardNameByTxId.get(String(tx.id)),
+          cardId: cardIdByTxId.get(String(tx.id)),
+        }));
+
         if (!cancelled) setItems(normalized);
       } catch (e) {
         console.error("LOAD TRANSACTIONS ERROR:", e);
@@ -80,7 +153,7 @@ export function Transactions() {
       if (!groups[date]) groups[date] = [];
       groups[date].push(transaction);
       return groups;
-    }, {} as Record<string, UiTransaction[]>);
+    }, {} as Record<string, UiTransactionRow[]>);
   }, [filteredTransactions]);
 
   const formatDate = (dateString: string) => {
@@ -184,7 +257,11 @@ export function Transactions() {
                             <div className="tx-meta-row">
                               <span className="tx-meta-text">{transaction.category}</span>
                               <span className="tx-dot">|</span>
-                              <span className="tx-meta-text tx-meta-capitalize">{transaction.paymentMethod}</span>
+                              <span className="tx-meta-text tx-meta-capitalize">
+                                {transaction.paymentMethod === "cash"
+                                  ? "Cash"
+                                  : transaction.cardName || transaction.paymentMethod}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -197,6 +274,10 @@ export function Transactions() {
                           </p>
                           <Link
                             to={`/transactions/${transaction.id}`}
+                            state={{
+                              paymentMethod: transaction.paymentMethod,
+                              cardId: transaction.cardId ?? null,
+                            }}
                             className="w-8 h-8 rounded-full bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                             aria-label="Edit transaction"
                             title="Edit transaction"
