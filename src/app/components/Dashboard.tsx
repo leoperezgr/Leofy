@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { UiTransaction, normalizeTransactions } from '../utils/transactionsMapper';
 import { BarChart, Bar, XAxis, ResponsiveContainer, LabelList } from 'recharts';
 import { formatMoney } from '../utils/formatMoney';
+import { applyCardOrder } from '../utils/cardOrder';
 import { LoadingScreen } from './LoadingScreen';
 import '../../styles/components/Dashboard.css';
 
@@ -209,7 +210,10 @@ export function Dashboard() {
   }, [data]);
 
   const cards = data?.cards ?? [];
-  const creditCards = cards.filter((c) => toNumber(c.credit_limit) > 0);
+  const creditCards = useMemo(
+    () => applyCardOrder(cards.filter((c) => toNumber(c.credit_limit) > 0)),
+    [cards]
+  );
   const debitCardIds = useMemo(
     () => new Set(cards.filter((c) => toNumber(c.credit_limit) <= 0).map((c) => toId(c.id))),
     [cards]

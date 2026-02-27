@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Receipt, CreditCard, BarChart3, Settings, Plus } from 'lucide-react';
+import { Home, Receipt, CreditCard, Wallet, BarChart3, Settings, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AddTransactionModal } from './AddTransactionModal';
 import '../../styles/components/Layout.css';
@@ -45,7 +45,7 @@ export function Layout() {
     { path: '/', icon: Home, label: 'Home' },
     { path: '/transactions', icon: Receipt, label: 'Transactions' },
     { path: '/cards', icon: CreditCard, label: 'Credit Cards' },
-    { path: '/debit-cards', icon: CreditCard, label: 'Debit Cards' },
+    { path: '/debit-cards', icon: Wallet, label: 'Debit Cards' },
     { path: '/statistics', icon: BarChart3, label: 'Stats' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];

@@ -1,7 +1,9 @@
 ﻿// src/components/ManageCards.tsx
 import { useEffect, useMemo, useState } from "react";
-import { CreditCard, Plus, Pencil, Trash2, X } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import { CreditCard, Plus, Pencil, Trash2, X, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { formatMoney } from "../utils/formatMoney";
+import { applyCardOrder, persistCardOrder } from "../utils/cardOrder";
 import { LoadingScreen } from "./LoadingScreen";
 import visaLogo from "../../assets/brands/visa.svg";
 import mastercardLogo from "../../assets/brands/mastercard.svg";
@@ -79,6 +81,7 @@ function colorLabel(c: CardColor) {
 
 export function ManageCards() {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+  const location = useLocation();
   const [items, setItems] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("all");
@@ -136,6 +139,22 @@ export function ManageCards() {
     };
   }, [items]);
 
+  const requestedEditCardId = useMemo(() => {
+    const state = location.state as { editCardId?: string | number } | null;
+    if (!state?.editCardId) return null;
+    return String(state.editCardId);
+  }, [location.state]);
+  const requestedReorder = useMemo(() => {
+    const state = location.state as { reorderCards?: boolean; reorderType?: Filter } | null;
+    return {
+      enabled: Boolean(state?.reorderCards),
+      type: state?.reorderType || "credit",
+    };
+  }, [location.state]);
+  const [reorderMode, setReorderMode] = useState(false);
+  const [didAutoOpenRequestedCard, setDidAutoOpenRequestedCard] = useState(false);
+  const [didApplyRequestedReorder, setDidApplyRequestedReorder] = useState(false);
+
   async function loadCards() {
     try {
       setLoading(true);
@@ -148,7 +167,7 @@ export function ManageCards() {
 
       if (!res.ok) throw new Error(data?.error || data?.message || "Failed to load cards");
 
-      setItems(Array.isArray(data) ? data : []);
+      setItems(applyCardOrder(Array.isArray(data) ? data : []));
     } catch (e: any) {
       setError(e?.message || "Error loading cards");
       setItems([]);
@@ -194,6 +213,61 @@ export function ManageCards() {
     setDueDay(card.due_day != null ? String(card.due_day) : "");
 
     setOpenModal(true);
+  }
+
+  useEffect(() => {
+    if (didAutoOpenRequestedCard) return;
+    if (!requestedEditCardId || loading) return;
+
+    const target = items.find((c) => String(c.id) === requestedEditCardId);
+    if (target) openEdit(target);
+    setDidAutoOpenRequestedCard(true);
+  }, [didAutoOpenRequestedCard, requestedEditCardId, loading, items]);
+
+  useEffect(() => {
+    if (didApplyRequestedReorder) return;
+    if (!requestedReorder.enabled) return;
+
+    setFilter(requestedReorder.type);
+    setReorderMode(true);
+    setDidApplyRequestedReorder(true);
+  }, [didApplyRequestedReorder, requestedReorder]);
+
+  function moveVisibleCard(cardId: string, direction: "up" | "down") {
+    setItems((prev) => {
+      const isVisible = (card: Card) => {
+        if (filter === "all") return true;
+        if (filter === "credit") return isCredit(card);
+        return !isCredit(card);
+      };
+
+      const visibleIds = prev.filter(isVisible).map((card) => String(card.id));
+      const fromIndex = visibleIds.indexOf(String(cardId));
+      if (fromIndex < 0) return prev;
+
+      const toIndex = direction === "up" ? fromIndex - 1 : fromIndex + 1;
+      if (toIndex < 0 || toIndex >= visibleIds.length) return prev;
+
+      const reorderedVisibleIds = [...visibleIds];
+      [reorderedVisibleIds[fromIndex], reorderedVisibleIds[toIndex]] = [
+        reorderedVisibleIds[toIndex],
+        reorderedVisibleIds[fromIndex],
+      ];
+
+      const byId = new Map(prev.map((card) => [String(card.id), card]));
+      const next = [...prev];
+      let pointer = 0;
+
+      for (let i = 0; i < next.length; i++) {
+        if (!isVisible(next[i])) continue;
+        const nextCard = byId.get(reorderedVisibleIds[pointer]);
+        if (nextCard) next[i] = nextCard;
+        pointer += 1;
+      }
+
+      persistCardOrder(next);
+      return next;
+    });
   }
 
   async function onDelete(card: Card) {
@@ -339,32 +413,52 @@ export function ManageCards() {
 
       {/* Filter */}
       <div className="mb-6">
-        <div className="inline-flex gap-2 p-1 bg-gray-100 rounded-xl">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex gap-2 p-1 bg-gray-100 rounded-xl">
+            <button
+              onClick={() => setFilter("all")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "all" ? "bg-white text-[#1F2933] shadow-sm" : "text-[#64748B]"
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setFilter("credit")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "credit" ? "bg-white text-[#1F2933] shadow-sm" : "text-[#64748B]"
+              }`}
+            >
+              Credit
+            </button>
+            <button
+              onClick={() => setFilter("debit")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                filter === "debit" ? "bg-white text-[#1F2933] shadow-sm" : "text-[#64748B]"
+              }`}
+            >
+              Debit
+            </button>
+          </div>
+
           <button
-            onClick={() => setFilter("all")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filter === "all" ? "bg-white text-[#1F2933] shadow-sm" : "text-[#64748B]"
+            onClick={() => setReorderMode((prev) => !prev)}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border font-medium transition-colors ${
+              reorderMode
+                ? "bg-[#ECFDF5] border-[#2DD4BF] text-[#0F766E]"
+                : "bg-white border-gray-200 text-[#334155] hover:bg-gray-50"
             }`}
+            title={reorderMode ? "Done reordering" : "Reorder cards"}
           >
-            All
-          </button>
-          <button
-            onClick={() => setFilter("credit")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filter === "credit" ? "bg-white text-[#1F2933] shadow-sm" : "text-[#64748B]"
-            }`}
-          >
-            Credit
-          </button>
-          <button
-            onClick={() => setFilter("debit")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filter === "debit" ? "bg-white text-[#1F2933] shadow-sm" : "text-[#64748B]"
-            }`}
-          >
-            Debit
+            <ArrowUpDown className="w-4 h-4" />
+            {reorderMode ? "Done reordering" : "Reorder cards"}
           </button>
         </div>
+        {reorderMode && (
+          <p className="mt-2 text-sm text-[#0F766E]">
+            Use the arrows to move cards and set your preferred order.
+          </p>
+        )}
       </div>
 
       {/* List */}
@@ -415,22 +509,43 @@ export function ManageCards() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => openEdit(card)}
-                    className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors"
-                    title="Edit"
-                  >
-                    <Pencil className="w-4 h-4 text-[#64748B]" />
-                  </button>
-                  <button
-                    onClick={() => onDelete(card)}
-                    className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-600" />
-                  </button>
-                </div>
+                {reorderMode ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => moveVisibleCard(String(card.id), "up")}
+                      disabled={idx === 0}
+                      className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Move up"
+                    >
+                      <ChevronUp className="w-4 h-4 text-[#64748B]" />
+                    </button>
+                    <button
+                      onClick={() => moveVisibleCard(String(card.id), "down")}
+                      disabled={idx === filtered.length - 1}
+                      className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Move down"
+                    >
+                      <ChevronDown className="w-4 h-4 text-[#64748B]" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => openEdit(card)}
+                      className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                      title="Edit"
+                    >
+                      <Pencil className="w-4 h-4 text-[#64748B]" />
+                    </button>
+                    <button
+                      onClick={() => onDelete(card)}
+                      className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-600" />
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })

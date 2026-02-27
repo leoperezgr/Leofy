@@ -2,6 +2,7 @@
 import { ArrowRight, AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { formatMoney } from "../utils/formatMoney";
+import { applyCardOrder } from "../utils/cardOrder";
 import { LoadingScreen } from "./LoadingScreen";
 import "../../styles/components/CreditCards.css";
 
@@ -151,7 +152,8 @@ export function CreditCards() {
 
   // UI cards: solo credit (credit_limit > 0)
   const uiCards: UiCard[] = useMemo(() => {
-    return cards
+    return applyCardOrder(
+      cards
       .map((c) => {
         const creditLimit = toNumber(c.credit_limit);
         const id = toId(c.id);
@@ -164,7 +166,8 @@ export function CreditCards() {
           colorClass: colorToGradient(c.color),
         };
       })
-      .filter((c) => c.creditLimit > 0);
+      .filter((c) => c.creditLimit > 0)
+    );
   }, [cards, usedByCard]);
 
   const totals = useMemo(() => {

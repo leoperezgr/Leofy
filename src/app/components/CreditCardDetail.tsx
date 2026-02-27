@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, AlertTriangle } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, AlertTriangle, Pencil, ArrowUpDown } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import * as LucideIcons from "lucide-react";
 import { formatMoney } from "../utils/formatMoney";
@@ -107,6 +107,7 @@ function colorToGradient(color?: string | null) {
 export function CreditCardDetail() {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
   const { cardId } = useParams<{ cardId: string }>();
+  const navigate = useNavigate();
 
   const [card, setCard] = useState<ApiCard | null>(null);
   const [tx, setTx] = useState<ApiTx[]>([]);
@@ -400,6 +401,14 @@ export function CreditCardDetail() {
 
   const gradient = colorToGradient(card.color);
   const available = Math.max(0, creditLimit - usedAmount);
+  const handleActivateReorderMode = () => {
+    navigate("/cards/manage", {
+      state: {
+        reorderCards: true,
+        reorderType: "credit",
+      },
+    });
+  };
 
   return (
     <div className="cd-page">
@@ -411,6 +420,17 @@ export function CreditCardDetail() {
         <ArrowLeft className="cd-back-icon" />
         <span className="cd-back-text">Back to Cards</span>
       </Link>
+
+      <div className="cd-quick-actions">
+        <button
+          type="button"
+          onClick={handleActivateReorderMode}
+          className="cd-activate-reorder-btn"
+        >
+          <ArrowUpDown className="cd-edit-card-btn-icon" />
+          Activate reorder mode
+        </button>
+      </div>
 
       {/* Card Visual */}
       <div
@@ -579,6 +599,17 @@ export function CreditCardDetail() {
             <p className="cd-subtitle">No transactions yet with this card</p>
           </div>
         )}
+      </div>
+
+      <div className="cd-bottom-actions">
+        <Link
+          to="/cards/manage"
+          state={{ editCardId: String(card.id) }}
+          className="cd-edit-card-btn"
+        >
+          <Pencil className="cd-edit-card-btn-icon" />
+          Edit this credit card
+        </Link>
       </div>
     </div>
   );
