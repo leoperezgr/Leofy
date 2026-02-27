@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, AlertTriangle, Pencil, ArrowUpDown } from "lucide-react";
+import { useParams, Link } from "react-router-dom";
+import { ArrowLeft, AlertTriangle, Pencil } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import * as LucideIcons from "lucide-react";
 import { formatMoney } from "../utils/formatMoney";
@@ -79,6 +79,52 @@ function isBetweenInclusive(date: Date, start: Date, end: Date) {
   return x >= startOfDay(start).getTime() && x <= startOfDay(end).getTime();
 }
 
+function computeAmountDueForRange(transactions: ApiTx[], currentCardId: string, start: Date, end: Date) {
+  const due = transactions.reduce((sum, t) => {
+    const type = String((t as any).type || "").toUpperCase();
+
+    const cid = (t as any).card_id ?? (t as any).cardId ?? null;
+    if (!cid || toId(cid) !== currentCardId) return sum;
+
+    const amount = toNumber((t as any).amount);
+    if (amount <= 0) return sum;
+
+    const occurredAt = new Date((t as any).occurred_at);
+    if (Number.isNaN(occurredAt.getTime())) return sum;
+
+    if (type === "INCOME") {
+      return isBetweenInclusive(occurredAt, start, end) ? sum - amount : sum;
+    }
+    if (type !== "EXPENSE") return sum;
+
+    const installments = (t as any)?.metadata?.installments;
+    if (installments && typeof installments === "object") {
+      const months = Math.trunc(toNumber((installments as any).months));
+      if (months < 2 || months > 60) return sum;
+
+      const monthlyAmount =
+        (installments as any).monthlyAmount !== undefined
+          ? toNumber((installments as any).monthlyAmount)
+          : toNumber(Number((amount / months).toFixed(2)));
+      if (monthlyAmount <= 0) return sum;
+
+      const startAtRaw = (installments as any).startAt || (t as any).occurred_at;
+      const startAtDate = new Date(startAtRaw);
+      if (Number.isNaN(startAtDate.getTime())) return sum;
+
+      const monthsElapsed = diffMonths(startOfDay(startAtDate), end);
+      if (monthsElapsed >= 0 && monthsElapsed < months) {
+        return sum + monthlyAmount;
+      }
+      return sum;
+    }
+
+    return isBetweenInclusive(occurredAt, start, end) ? sum + amount : sum;
+  }, 0);
+
+  return Math.max(0, due);
+}
+
 function colorToGradient(color?: string | null) {
   switch ((color || "OTHER").toUpperCase()) {
     case "RED":
@@ -107,7 +153,6 @@ function colorToGradient(color?: string | null) {
 export function CreditCardDetail() {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
   const { cardId } = useParams<{ cardId: string }>();
-  const navigate = useNavigate();
 
   const [card, setCard] = useState<ApiCard | null>(null);
   const [tx, setTx] = useState<ApiTx[]>([]);
@@ -276,54 +321,20 @@ export function CreditCardDetail() {
     const nextDay = new Date(prevClosing.getFullYear(), prevClosing.getMonth(), prevClosing.getDate() + 1);
     return startOfDay(nextDay);
   }, [cycleEnd]);
+  const nextCycleStart = useMemo(() => {
+    if (!cycleEnd) return null;
+    return startOfDay(new Date(cycleEnd.getFullYear(), cycleEnd.getMonth(), cycleEnd.getDate() + 1));
+  }, [cycleEnd]);
+  const nextCycleEnd = useMemo(() => (cycleEnd ? startOfDay(addMonths(cycleEnd, 1)) : null), [cycleEnd]);
 
   const amountDueCycle = useMemo(() => {
     if (!cardId || !isCredit || !cycleStart || !cycleEnd) return 0;
-
-    const due = tx.reduce((sum, t) => {
-      const type = String((t as any).type || "").toUpperCase();
-
-      const cid = (t as any).card_id ?? (t as any).cardId ?? null;
-      if (!cid || toId(cid) !== String(cardId)) return sum;
-
-      const amount = toNumber((t as any).amount);
-      if (amount <= 0) return sum;
-
-      const occurredAt = new Date((t as any).occurred_at);
-      if (Number.isNaN(occurredAt.getTime())) return sum;
-
-      if (type === "INCOME") {
-        return isBetweenInclusive(occurredAt, cycleStart, cycleEnd) ? sum - amount : sum;
-      }
-      if (type !== "EXPENSE") return sum;
-
-      const installments = (t as any)?.metadata?.installments;
-      if (installments && typeof installments === "object") {
-        const months = Math.trunc(toNumber((installments as any).months));
-        if (months < 2 || months > 60) return sum;
-
-        const monthlyAmount =
-          (installments as any).monthlyAmount !== undefined
-            ? toNumber((installments as any).monthlyAmount)
-            : toNumber(Number((amount / months).toFixed(2)));
-        if (monthlyAmount <= 0) return sum;
-
-        const startAtRaw = (installments as any).startAt || (t as any).occurred_at;
-        const startAtDate = new Date(startAtRaw);
-        if (Number.isNaN(startAtDate.getTime())) return sum;
-
-        const monthsElapsed = diffMonths(startOfDay(startAtDate), cycleEnd);
-        if (monthsElapsed >= 0 && monthsElapsed < months) {
-          return sum + monthlyAmount;
-        }
-        return sum;
-      }
-
-      return isBetweenInclusive(occurredAt, cycleStart, cycleEnd) ? sum + amount : sum;
-    }, 0);
-
-    return Math.max(0, due);
+    return computeAmountDueForRange(tx, String(cardId), cycleStart, cycleEnd);
   }, [tx, cardId, isCredit, cycleStart, cycleEnd]);
+  const amountDueNextCycle = useMemo(() => {
+    if (!cardId || !isCredit || !nextCycleStart || !nextCycleEnd) return 0;
+    return computeAmountDueForRange(tx, String(cardId), nextCycleStart, nextCycleEnd);
+  }, [tx, cardId, isCredit, nextCycleStart, nextCycleEnd]);
 
   const last30Days = useMemo(() => {
     const days = Array.from({ length: 30 }, (_, i) => {
@@ -401,14 +412,6 @@ export function CreditCardDetail() {
 
   const gradient = colorToGradient(card.color);
   const available = Math.max(0, creditLimit - usedAmount);
-  const handleActivateReorderMode = () => {
-    navigate("/cards/manage", {
-      state: {
-        reorderCards: true,
-        reorderType: "credit",
-      },
-    });
-  };
 
   return (
     <div className="cd-page">
@@ -420,17 +423,6 @@ export function CreditCardDetail() {
         <ArrowLeft className="cd-back-icon" />
         <span className="cd-back-text">Back to Cards</span>
       </Link>
-
-      <div className="cd-quick-actions">
-        <button
-          type="button"
-          onClick={handleActivateReorderMode}
-          className="cd-activate-reorder-btn"
-        >
-          <ArrowUpDown className="cd-edit-card-btn-icon" />
-          Activate reorder mode
-        </button>
-      </div>
 
       {/* Card Visual */}
       <div
@@ -453,8 +445,8 @@ export function CreditCardDetail() {
       {/* Usage Stats */}
       {isCredit && (
         <div className="cd-box cd-box-spacing">
-          <div className="cd-stats-grid">
-            <div>
+          <div className="cd-stats-grid cd-cycle-stats-grid">
+            <div className="cd-cycle-stat">
               <p className="cd-label">Closing date</p>
               <p className="cd-stat-value">Every {closingDay || "--"}</p>
               <p className="cd-subtitle">
@@ -463,7 +455,7 @@ export function CreditCardDetail() {
                   : "Not set"}
               </p>
             </div>
-            <div>
+            <div className="cd-cycle-stat">
               <p className="cd-label">Payment due</p>
               <p className="cd-stat-value">Every {dueDay || "--"}</p>
               <p className="cd-subtitle">
@@ -472,13 +464,22 @@ export function CreditCardDetail() {
                   : "Not set"}
               </p>
             </div>
-            <div>
+            <div className="cd-cycle-stat">
               <p className="cd-label">Amount due this cycle</p>
               <p className="cd-stat-value">${formatMoney(amountDueCycle)}</p>
               <p className="cd-subtitle">
                 {cycleStart && cycleEnd
                   ? `${cycleStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${cycleEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
                   : "Current cycle"}
+              </p>
+            </div>
+            <div className="cd-cycle-stat">
+              <p className="cd-label">Projected due next cycle</p>
+              <p className="cd-stat-value">${formatMoney(amountDueNextCycle)}</p>
+              <p className="cd-subtitle">
+                {nextCycleStart && nextCycleEnd
+                  ? `${nextCycleStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${nextCycleEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                  : "Next cycle"}
               </p>
             </div>
           </div>

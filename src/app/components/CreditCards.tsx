@@ -1,5 +1,5 @@
 ﻿import { Link } from "react-router-dom";
-import { ArrowRight, AlertTriangle } from "lucide-react";
+import { ArrowRight, AlertTriangle, ArrowUpDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { formatMoney } from "../utils/formatMoney";
 import { applyCardOrder } from "../utils/cardOrder";
@@ -338,6 +338,17 @@ export function CreditCards() {
           })}
         </div>
       )}
+
+      <div className="cc-reorder-wrap">
+        <Link
+          to="/cards/manage"
+          state={{ reorderCards: true, reorderType: "credit" }}
+          className="cc-reorder-link"
+        >
+          <ArrowUpDown className="cc-reorder-icon" />
+          Activate reorder mode
+        </Link>
+      </div>
     </div>
   );
 }

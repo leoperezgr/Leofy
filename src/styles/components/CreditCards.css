@@ -343,6 +343,37 @@
   width: 1rem;
 }
 
+.cc-reorder-wrap {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cc-reorder-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid #d1fae5;
+  border-radius: 0.75rem;
+  background: #f0fdfa;
+  color: #0f766e;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.625rem 0.875rem;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.cc-reorder-link:hover {
+  background: #ccfbf1;
+  border-color: #99f6e4;
+  transform: translateY(-1px);
+}
+
+.cc-reorder-icon {
+  height: 1rem;
+  width: 1rem;
+}
+
 @media (min-width: 1024px) {
   .cc-page {
     padding: 2rem;

@@ -180,6 +180,17 @@
   gap: 1.5rem;
 }
 
+.cd-cycle-stats-grid {
+  gap: 0.9rem;
+}
+
+.cd-cycle-stat {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+  padding: 0.9rem;
+}
+
 .cd-label,
 .cd-usage-label {
   margin-bottom: 0.5rem;
@@ -416,5 +427,10 @@
 
   .cd-stats-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .cd-cycle-stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
   }
 }
