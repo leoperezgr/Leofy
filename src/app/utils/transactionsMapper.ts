@@ -13,9 +13,13 @@ export type ApiTransaction = {
   category?: string | null;
   category_id?: string | number | null;
 
+  payment_method?: string | null;
+  paymentMethod?: string | null;
+
   metadata?: {
     category_name?: string;
     payment_method?: string;
+    paymentMethod?: string;
     [key: string]: any;
   } | null;
 };
@@ -45,8 +49,13 @@ export function toUiTransaction(t: ApiTransaction): UiTransaction {
     (t.metadata?.category_name && String(t.metadata.category_name)) ||
     (t.category_id != null ? `Category #${t.category_id}` : 'Uncategorized');
 
-  const paymentMethod =
-    (t.metadata?.payment_method && String(t.metadata.payment_method)) || 'cash';
+  const paymentMethodRaw =
+    t.payment_method ??
+    t.paymentMethod ??
+    t.metadata?.payment_method ??
+    t.metadata?.paymentMethod;
+
+  const paymentMethod = paymentMethodRaw ? String(paymentMethodRaw).toLowerCase() : 'cash';
 
   return {
     id: String(t.id),
