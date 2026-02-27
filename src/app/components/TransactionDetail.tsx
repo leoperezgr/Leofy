@@ -5,6 +5,7 @@ import * as LucideIcons from "lucide-react";
 import { categories } from "../utils/mockData";
 import { UiTransaction, normalizeTransactions } from "../utils/transactionsMapper";
 import { formatMoney } from "../utils/formatMoney";
+import { LoadingScreen } from "./LoadingScreen";
 
 type Card = {
   id: string;
@@ -278,11 +279,10 @@ export function TransactionDetail() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto p-4 lg:p-8">
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <p className="text-sm text-[#64748B]">Loading transaction...</p>
-        </div>
-      </div>
+      <LoadingScreen
+        title="Transaction Detail"
+        message="Loading transaction data..."
+      />
     );
   }
 

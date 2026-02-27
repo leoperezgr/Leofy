@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "rec
 import * as LucideIcons from "lucide-react";
 import { formatMoney } from "../utils/formatMoney";
 import { getCategoryIcon } from "../utils/mockData"; // si ya tienes un mapper real, lo cambiamos luego
+import { LoadingScreen } from "./LoadingScreen";
 import "../../styles/components/CardDetail.css";
 
 type ApiCard = {
@@ -278,14 +279,23 @@ export function CreditCardDetail() {
   const amountDueCycle = useMemo(() => {
     if (!cardId || !isCredit || !cycleStart || !cycleEnd) return 0;
 
-    return tx.reduce((sum, t) => {
+    const due = tx.reduce((sum, t) => {
       const type = String((t as any).type || "").toUpperCase();
-      if (type !== "EXPENSE") return sum;
 
       const cid = (t as any).card_id ?? (t as any).cardId ?? null;
       if (!cid || toId(cid) !== String(cardId)) return sum;
 
       const amount = toNumber((t as any).amount);
+      if (amount <= 0) return sum;
+
+      const occurredAt = new Date((t as any).occurred_at);
+      if (Number.isNaN(occurredAt.getTime())) return sum;
+
+      if (type === "INCOME") {
+        return isBetweenInclusive(occurredAt, cycleStart, cycleEnd) ? sum - amount : sum;
+      }
+      if (type !== "EXPENSE") return sum;
+
       const installments = (t as any)?.metadata?.installments;
       if (installments && typeof installments === "object") {
         const months = Math.trunc(toNumber((installments as any).months));
@@ -308,10 +318,10 @@ export function CreditCardDetail() {
         return sum;
       }
 
-      const occurredAt = new Date((t as any).occurred_at);
-      if (Number.isNaN(occurredAt.getTime())) return sum;
       return isBetweenInclusive(occurredAt, cycleStart, cycleEnd) ? sum + amount : sum;
     }, 0);
+
+    return Math.max(0, due);
   }, [tx, cardId, isCredit, cycleStart, cycleEnd]);
 
   const last30Days = useMemo(() => {
@@ -337,12 +347,10 @@ export function CreditCardDetail() {
 
   if (loading) {
     return (
-      <div className="cd-page">
-        <div className="cd-header">
-          <h1 className="cd-title">Card Details</h1>
-          <p className="cd-subtitle">Loadingâ€¦</p>
-        </div>
-      </div>
+      <LoadingScreen
+        title="Card Details"
+        message="Loading card movements..."
+      />
     );
   }
 

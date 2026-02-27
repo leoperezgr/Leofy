@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, ResponsiveContainer, Legend, Tooltip, LabelList } from 'recharts';
 import { formatMoney } from '../utils/formatMoney';
+import { LoadingScreen } from './LoadingScreen';
 import '../../styles/components/Statistics.css';
 
 type ApiTx = {
@@ -223,12 +224,10 @@ export function Statistics() {
 
   if (loading) {
     return (
-      <div className="stats-page">
-        <div className="stats-header">
-          <h1 className="stats-title">Statistics</h1>
-          <p className="stats-subtitle">Loading...</p>
-        </div>
-      </div>
+      <LoadingScreen
+        title="Statistics"
+        message="Preparing your spending insights..."
+      />
     );
   }
 

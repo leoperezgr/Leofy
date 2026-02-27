@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { User, DollarSign, Download, Tag, LogOut, CreditCard, Pencil } from "lucide-react";
+import { LoadingScreen } from "./LoadingScreen";
 import "../../styles/components/Settings.css";
 
 type MeResponse = {
@@ -128,6 +129,15 @@ export function Settings() {
     setIsEditing(false);
   }
 
+  if (loading) {
+    return (
+      <LoadingScreen
+        title="Settings"
+        message="Loading your profile and preferences..."
+      />
+    );
+  }
+
   return (
     <div className="settings-page">
       <div className="settings-header">
@@ -151,12 +161,6 @@ export function Settings() {
           <p className="settings-error-text">{error}</p>
         </div>
       )}
-      {loading && (
-        <div className="settings-status-box">
-          <p className="settings-loading-text">Loading profile...</p>
-        </div>
-      )}
-
       <div className="settings-card">
         <div className="settings-profile-head">
           <h3 className="settings-section-title">
