@@ -59,6 +59,37 @@
   font-weight: 500;
 }
 
+.cd-quick-actions {
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: stretch;
+}
+
+.cd-activate-reorder-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid #0ea5e9;
+  border-radius: 0.85rem;
+  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+  color: #fff;
+  font-weight: 700;
+  padding: 0.85rem 1rem;
+  box-shadow: 0 10px 20px rgb(14 165 233 / 0.25);
+  transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+}
+
+.cd-activate-reorder-btn:hover {
+  filter: brightness(1.04);
+  box-shadow: 0 12px 24px rgb(14 165 233 / 0.3);
+}
+
+.cd-activate-reorder-btn:active {
+  transform: translateY(1px);
+}
+
 .cd-not-found,
 .cd-empty-state {
   padding: 3rem 0;
@@ -332,6 +363,41 @@
 .cd-transaction-date {
   color: #94a3b8;
   font-size: 0.75rem;
+}
+
+.cd-bottom-actions {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.cd-edit-card-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid #99f6e4;
+  border-radius: 0.75rem;
+  background: #ecfdf5;
+  color: #0f766e;
+  font-weight: 600;
+  padding: 0.65rem 0.9rem;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.cd-edit-card-btn:hover {
+  background: #ccfbf1;
+  border-color: #2dd4bf;
+}
+
+.cd-edit-card-btn:active {
+  transform: translateY(1px);
+}
+
+.cd-edit-card-btn-icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 @media (min-width: 1024px) {
