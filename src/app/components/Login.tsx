@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import '../../styles/components/Login.css';
 
 type LoginResponse = {
   token: string;
@@ -87,7 +88,7 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4">
+    <div className="login-page min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">

@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, ArrowDownRight, Wallet } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Wallet, DollarSign } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { UiTransaction, normalizeTransactions } from '../utils/transactionsMapper';
 import { BarChart, Bar, XAxis, ResponsiveContainer, LabelList } from 'recharts';
 import { formatMoney } from '../utils/formatMoney';
+import '../../styles/components/Dashboard.css';
 
 type DashboardData = {
   income: number;
@@ -178,7 +179,7 @@ export function Dashboard() {
   if (loading) {
     // sin romper estilos: mismo contenedor, solo placeholder
     return (
-      <div className="max-w-7xl mx-auto p-4 lg:p-8">
+      <div className="dashboard-page max-w-7xl mx-auto p-4 lg:p-8">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold text-[#1F2933] mb-2">Dashboard</h1>
           <p className="text-[#64748B]">Loading…</p>
@@ -188,40 +189,54 @@ export function Dashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 lg:p-8">
+    <div className="dashboard-page max-w-7xl mx-auto p-4 lg:p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-semibold text-[#1F2933] mb-2">Dashboard</h1>
         <p className="text-[#64748B]">Here's your financial overview for February</p>
       </div>
 
-      {/* Balance Card */}
+      {/* Available Card */}
       <div className="bg-gradient-to-br from-[#2DD4BF] to-[#14B8A6] rounded-2xl p-6 lg:p-8 text-white mb-6 shadow-lg">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <p className="text-white/80 mb-2">Total Balance</p>
+            <p className="text-white/80 mb-2">Available</p>
             <h2 className="text-4xl lg:text-5xl font-bold">${formatMoney(balance)}</h2>
+            <p className="text-white/80 text-sm mt-2">Available to spend</p>
           </div>
           <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
             <Wallet className="w-6 h-6" />
           </div>
         </div>
+      </div>
+
+      {/* Balance Card */}
+      <div className="bg-white rounded-2xl p-6 lg:p-8 shadow-lg mb-6">
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <p className="text-[#64748B] mb-2">Total Balance</p>
+            <h2 className="text-4xl lg:text-5xl font-bold text-[#1F2933]">${formatMoney(balance)}</h2>
+          </div>
+          <div className="w-12 h-12 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center">
+            <DollarSign className="w-6 h-6 text-[#64748B]" />
+          </div>
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+          <div className="bg-gray-50 rounded-xl border border-gray-100 p-4">
             <div className="flex items-center gap-2 mb-2">
-              <ArrowUpRight className="w-4 h-4" />
-              <span className="text-sm text-white/80">Income</span>
+              <ArrowUpRight className="w-4 h-4 text-[#64748B]" />
+              <span className="text-sm text-[#64748B]">Income</span>
             </div>
-            <p className="text-2xl font-semibold">${formatMoney(income)}</p>
+            <p className="text-2xl font-semibold text-[#1F2933]">${formatMoney(income)}</p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+          <div className="bg-gray-50 rounded-xl border border-gray-100 p-4">
             <div className="flex items-center gap-2 mb-2">
-              <ArrowDownRight className="w-4 h-4" />
-              <span className="text-sm text-white/80">Expenses</span>
+              <ArrowDownRight className="w-4 h-4 text-[#64748B]" />
+              <span className="text-sm text-[#64748B]">Expenses</span>
             </div>
-            <p className="text-2xl font-semibold">${formatMoney(expenses)}</p>
+            <p className="text-2xl font-semibold text-[#1F2933]">${formatMoney(expenses)}</p>
           </div>
         </div>
       </div>

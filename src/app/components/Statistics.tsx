@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, ResponsiveContainer, Legend, Tooltip, LabelList } from 'recharts';
 import { formatMoney } from '../utils/formatMoney';
+import '../../styles/components/Statistics.css';
 
 type ApiTx = {
   id: string | number;
@@ -193,51 +194,51 @@ export function Statistics() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto p-4 lg:p-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-semibold text-[#1F2933] mb-2">Statistics</h1>
-          <p className="text-[#64748B]">Loading…</p>
+      <div className="stats-page">
+        <div className="stats-header">
+          <h1 className="stats-title">Statistics</h1>
+          <p className="stats-subtitle">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 lg:p-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-semibold text-[#1F2933] mb-2">Statistics</h1>
-        <p className="text-[#64748B]">Your spending insights for February</p>
+    <div className="stats-page">
+      <div className="stats-header">
+        <h1 className="stats-title">Statistics</h1>
+        <p className="stats-subtitle">Your spending insights for February</p>
       </div>
 
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-2xl p-4">
-          <p className="text-red-700 text-sm">{error}</p>
+        <div className="stats-error-box">
+          <p className="stats-error-text">{error}</p>
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-2xl p-4 lg:p-6 shadow-sm border border-gray-100">
-          <p className="text-sm text-[#64748B] mb-2">Total Income</p>
-          <p className="text-2xl lg:text-3xl font-bold text-green-600">${formatMoney(incomeTotal)}</p>
+      <div className="stats-metrics-grid">
+        <div className="stats-metric-card">
+          <p className="stats-metric-label">Total Income</p>
+          <p className="stats-metric-value stats-metric-income">${formatMoney(incomeTotal)}</p>
         </div>
-        <div className="bg-white rounded-2xl p-4 lg:p-6 shadow-sm border border-gray-100">
-          <p className="text-sm text-[#64748B] mb-2">Total Expenses</p>
-          <p className="text-2xl lg:text-3xl font-bold text-red-600">${formatMoney(expensesTotal)}</p>
+        <div className="stats-metric-card">
+          <p className="stats-metric-label">Total Expenses</p>
+          <p className="stats-metric-value stats-metric-expense">${formatMoney(expensesTotal)}</p>
         </div>
-        <div className="bg-white rounded-2xl p-4 lg:p-6 shadow-sm border border-gray-100">
-          <p className="text-sm text-[#64748B] mb-2">Transactions</p>
-          <p className="text-2xl lg:text-3xl font-bold text-[#1F2933]">{transactions.length}</p>
+        <div className="stats-metric-card">
+          <p className="stats-metric-label">Transactions</p>
+          <p className="stats-metric-value">{transactions.length}</p>
         </div>
-        <div className="bg-white rounded-2xl p-4 lg:p-6 shadow-sm border border-gray-100">
-          <p className="text-sm text-[#64748B] mb-2">Savings</p>
-          <p className="text-2xl lg:text-3xl font-bold text-[#2DD4BF]">${formatMoney(savings)}</p>
+        <div className="stats-metric-card">
+          <p className="stats-metric-label">Savings</p>
+          <p className="stats-metric-value stats-metric-savings">${formatMoney(savings)}</p>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-[#1F2933] mb-6">Income vs Expenses</h3>
-          <div className="flex items-center justify-center">
+      <div className="stats-grid-two">
+        <div className="stats-card">
+          <h3 className="stats-card-title">Income vs Expenses</h3>
+          <div className="stats-chart-center">
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
                 <Pie
@@ -265,21 +266,19 @@ export function Statistics() {
                 <Legend
                   verticalAlign="bottom"
                   height={36}
-                  formatter={(value) => <span className="text-sm text-[#64748B]">{value}</span>}
+                  formatter={(value) => <span className="stats-legend-text">{value}</span>}
                 />
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[#64748B]">Savings Rate</span>
-              <span className="text-lg font-semibold text-[#1F2933]">{savingsRate.toFixed(1)}%</span>
-            </div>
+          <div className="stats-footer-row">
+            <span className="stats-metric-label">Savings Rate</span>
+            <span className="stats-footer-value">{savingsRate.toFixed(1)}%</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-[#1F2933] mb-6">Spending by Category</h3>
+        <div className="stats-card">
+          <h3 className="stats-card-title">Spending by Category</h3>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={spendingByCategory}>
               <XAxis
@@ -317,28 +316,28 @@ export function Statistics() {
       </div>
 
       {spendingByCard.length > 0 && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-[#1F2933] mb-6">Spending by Credit Card</h3>
-          <div className="space-y-4">
+        <div className="stats-card stats-card-gap">
+          <h3 className="stats-card-title">Spending by Credit Card</h3>
+          <div className="stats-card-list">
             {spendingByCard.map((item) => {
               const percentage = item.creditLimit > 0 ? (item.value / item.creditLimit) * 100 : 0;
 
               return (
                 <div key={item.id}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${item.colorClass} flex items-center justify-center`}>
-                        <span className="text-white text-xs font-mono">••••</span>
+                  <div className="stats-card-row-head">
+                    <div className="stats-card-row-left">
+                      <div className={`stats-card-chip bg-gradient-to-br ${item.colorClass}`}>
+                        <span className="stats-card-chip-text">....</span>
                       </div>
-                      <span className="font-medium text-[#1F2933]">{item.name}</span>
+                      <span className="stats-card-name">{item.name}</span>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-[#1F2933]">${formatMoney(item.value)}</p>
-                      <p className="text-xs text-[#64748B]">{percentage.toFixed(1)}% used</p>
+                    <div className="stats-card-row-right">
+                      <p className="stats-card-amount">${formatMoney(item.value)}</p>
+                      <p className="stats-card-percent">{percentage.toFixed(1)}% used</p>
                     </div>
                   </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#3B82F6] rounded-full transition-all" style={{ width: `${Math.min(100, percentage)}%` }} />
+                  <div className="stats-progress-track">
+                    <div className="stats-progress-fill" style={{ width: `${Math.min(100, percentage)}%` }} />
                   </div>
                 </div>
               );
@@ -347,16 +346,16 @@ export function Statistics() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mt-6">
-        <h3 className="text-lg font-semibold text-[#1F2933] mb-4">Category Breakdown</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full">
+      <div className="stats-card stats-card-gap">
+        <h3 className="stats-card-title">Category Breakdown</h3>
+        <div className="stats-table-wrap">
+          <table className="stats-table">
             <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left py-3 px-4 text-sm font-medium text-[#64748B]">Category</th>
-                <th className="text-right py-3 px-4 text-sm font-medium text-[#64748B]">Amount</th>
-                <th className="text-right py-3 px-4 text-sm font-medium text-[#64748B]">% of Total</th>
-                <th className="text-right py-3 px-4 text-sm font-medium text-[#64748B]">Transactions</th>
+              <tr className="stats-table-head-row">
+                <th className="stats-th stats-th-left">Category</th>
+                <th className="stats-th stats-th-right">Amount</th>
+                <th className="stats-th stats-th-right">% of Total</th>
+                <th className="stats-th stats-th-right">Transactions</th>
               </tr>
             </thead>
             <tbody>
@@ -364,16 +363,16 @@ export function Statistics() {
                 const percentage = expensesTotal > 0 ? (item.value / expensesTotal) * 100 : 0;
 
                 return (
-                  <tr key={item.name} className="border-b border-gray-50 last:border-0">
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                        <span className="font-medium text-[#1F2933]">{item.name}</span>
+                  <tr key={item.name} className="stats-tr">
+                    <td className="stats-td stats-td-left">
+                      <div className="stats-category-cell">
+                        <div className="stats-category-dot" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                        <span className="stats-card-name">{item.name}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-right font-semibold text-[#1F2933]">${formatMoney(item.value)}</td>
-                    <td className="py-3 px-4 text-right text-[#64748B]">{percentage.toFixed(1)}%</td>
-                    <td className="py-3 px-4 text-right text-[#64748B]">{item.transactions}</td>
+                    <td className="stats-td stats-td-right stats-card-amount">${formatMoney(item.value)}</td>
+                    <td className="stats-td stats-td-right stats-metric-label">{percentage.toFixed(1)}%</td>
+                    <td className="stats-td stats-td-right stats-metric-label">{item.transactions}</td>
                   </tr>
                 );
               })}

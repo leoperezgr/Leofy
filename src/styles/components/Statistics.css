@@ -1,0 +1,260 @@
+.stats-page {
+  margin: 0 auto;
+  max-width: 80rem;
+  padding: 1rem;
+}
+
+.stats-header,
+.stats-metrics-grid,
+.stats-grid-two,
+.stats-card-gap {
+  margin-bottom: 1.5rem;
+}
+
+.stats-title {
+  margin-bottom: 0.5rem;
+  color: #1f2933;
+  font-size: 1.875rem;
+  font-weight: 600;
+}
+
+.stats-subtitle,
+.stats-metric-label,
+.stats-card-percent,
+.stats-legend-text {
+  color: #64748b;
+}
+
+.stats-error-box {
+  margin-bottom: 1.5rem;
+  border: 1px solid #fecaca;
+  border-radius: 1rem;
+  background: #fef2f2;
+  padding: 1rem;
+}
+
+.stats-error-text {
+  color: #b91c1c;
+  font-size: 0.875rem;
+}
+
+.stats-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.stats-metric-card,
+.stats-card {
+  border: 1px solid #f3f4f6;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1rem;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+}
+
+.stats-metric-label {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.stats-metric-value,
+.stats-footer-value,
+.stats-card-amount,
+.stats-card-name {
+  color: #1f2933;
+  font-weight: 700;
+}
+
+.stats-metric-value {
+  font-size: 1.5rem;
+}
+
+.stats-metric-income {
+  color: #16a34a;
+}
+
+.stats-metric-expense {
+  color: #dc2626;
+}
+
+.stats-metric-savings {
+  color: #2dd4bf;
+}
+
+.stats-grid-two {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.stats-card {
+  padding: 1.5rem;
+}
+
+.stats-card-title {
+  margin-bottom: 1.5rem;
+  color: #1f2933;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.stats-chart-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stats-footer-row {
+  margin-top: 1rem;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stats-footer-value {
+  font-size: 1.125rem;
+}
+
+.stats-card-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.stats-card-row-head,
+.stats-card-row-left {
+  display: flex;
+  align-items: center;
+}
+
+.stats-card-row-head {
+  margin-bottom: 0.5rem;
+  justify-content: space-between;
+}
+
+.stats-card-row-left {
+  gap: 0.75rem;
+}
+
+.stats-card-row-right {
+  text-align: right;
+}
+
+.stats-card-chip {
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background-image: linear-gradient(to bottom right, var(--tw-gradient-from), var(--tw-gradient-to));
+}
+
+.stats-card-chip-text {
+  color: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.75rem;
+}
+
+.stats-card-name {
+  font-weight: 500;
+}
+
+.stats-card-amount {
+  font-weight: 600;
+}
+
+.stats-card-percent {
+  font-size: 0.75rem;
+}
+
+.stats-progress-track {
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: #f3f4f6;
+}
+
+.stats-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: #3b82f6;
+  transition: width 150ms ease;
+}
+
+.stats-table-wrap {
+  overflow-x: auto;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.stats-table-head-row {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.stats-th,
+.stats-td {
+  padding: 0.75rem 1rem;
+}
+
+.stats-th {
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.stats-th-left,
+.stats-td-left {
+  text-align: left;
+}
+
+.stats-th-right,
+.stats-td-right {
+  text-align: right;
+}
+
+.stats-tr {
+  border-bottom: 1px solid #f9fafb;
+}
+
+.stats-tr:last-child {
+  border-bottom: 0;
+}
+
+.stats-category-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stats-category-dot {
+  height: 0.75rem;
+  width: 0.75rem;
+  border-radius: 9999px;
+}
+
+@media (min-width: 1024px) {
+  .stats-page {
+    padding: 2rem;
+  }
+
+  .stats-metrics-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .stats-grid-two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-metric-card {
+    padding: 1.5rem;
+  }
+
+  .stats-metric-value {
+    font-size: 1.875rem;
+  }
+}
