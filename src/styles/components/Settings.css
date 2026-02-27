@@ -88,6 +88,43 @@
   display: block;
 }
 
+.settings-profile-head {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.settings-profile-head .settings-section-title {
+  margin-bottom: 0;
+}
+
+.settings-profile-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.625rem;
+  background: #fff;
+  padding: 0.35rem 0.65rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: border-color 150ms ease, color 150ms ease, background-color 150ms ease;
+}
+
+.settings-profile-edit-btn:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #1f2933;
+}
+
+.settings-profile-edit-icon {
+  height: 0.85rem;
+  width: 0.85rem;
+}
+
 .settings-stack,
 .settings-category-list,
 .settings-about-links {
@@ -172,6 +209,126 @@
   background: #f9fafb;
   padding: 0.75rem;
   transition: background-color 150ms ease;
+}
+
+.settings-category-row-clickable {
+  cursor: pointer;
+}
+
+.settings-category-row-active {
+  border: 1px solid #99f6e4;
+  background: #f0fdfa;
+}
+
+.settings-category-editor {
+  margin-bottom: 1rem;
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid #f1f5f9;
+  border-radius: 0.875rem;
+  background: #fcfdff;
+  padding: 0.875rem;
+}
+
+.settings-category-view-row {
+  margin-bottom: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.settings-category-type-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.settings-category-type-btn {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.625rem;
+  background: #fff;
+  padding: 0.35rem 0.75rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.settings-category-type-btn-active {
+  border-color: #2dd4bf;
+  background: #2dd4bf;
+  color: #fff;
+}
+
+.settings-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.settings-icon-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.625rem;
+  background: #fff;
+  padding: 0.35rem;
+  color: #64748b;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.settings-icon-option-active {
+  border-color: #2dd4bf;
+  background: #e6fffb;
+  color: #0f766e;
+}
+
+.settings-icon-option-icon {
+  height: 1rem;
+  width: 1rem;
+}
+
+.settings-category-left,
+.settings-category-actions {
+  display: flex;
+  align-items: center;
+}
+
+.settings-category-left {
+  gap: 0.65rem;
+}
+
+.settings-category-actions {
+  gap: 0.75rem;
+}
+
+.settings-category-icon-wrap {
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.625rem;
+  background: #ecfeff;
+  color: #0f766e;
+}
+
+.settings-category-icon {
+  height: 1rem;
+  width: 1rem;
+}
+
+.settings-category-type {
+  margin-top: 0.2rem;
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+.settings-category-delete-btn {
+  border: 0;
+  background: transparent;
+  color: #ef4444;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .settings-category-name,

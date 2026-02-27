@@ -31,9 +31,21 @@ type DashboardData = {
   }>;
 };
 
+type ApiTx = {
+  id: string | number;
+  type: 'INCOME' | 'EXPENSE' | 'income' | 'expense';
+  amount: number | string;
+  card_id?: string | number | null;
+  cardId?: string | number | null;
+};
+
 function toNumber(v: unknown) {
   const n = typeof v === 'string' ? Number(v) : Number(v ?? 0);
   return Number.isFinite(n) ? n : 0;
+}
+
+function toId(v: string | number) {
+  return typeof v === 'number' ? String(v) : String(v);
 }
 
 function cardColorToGradient(color?: string | null) {
@@ -83,10 +95,25 @@ function renderBarAmountLabel(props: any) {
 
 export function Dashboard() {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+  const userName = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('leofy_user');
+      if (!raw) return '';
+      const parsed = JSON.parse(raw);
+      return (
+        String(parsed?.full_name || parsed?.name || '').trim() ||
+        String(parsed?.email || '').split('@')[0] ||
+        ''
+      );
+    } catch {
+      return '';
+    }
+  }, []);
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [recentUi, setRecentUi] = useState<UiTransaction[]>([]);
+  const [transactions, setTransactions] = useState<ApiTx[]>([]);
 
   useEffect(() => {
   let cancelled = false;
@@ -107,6 +134,9 @@ export function Dashboard() {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         }
       );
+      const txRes = await fetch(`${API_BASE}/api/transactions`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
 
       const text = await res.text(); // 👈 lee aunque no sea JSON
       let json: any = null;
@@ -124,13 +154,21 @@ export function Dashboard() {
         });
         throw new Error((json?.error || json?.message || text || 'Failed to load dashboard').toString());
       }
+      const txJson = await txRes.json().catch(() => null);
+      if (!txRes.ok) {
+        throw new Error((txJson?.error || txJson?.message || 'Failed to load transactions').toString());
+      }
 
       if (!cancelled) setData(json);
+      if (!cancelled) setTransactions(Array.isArray(txJson) ? txJson : []);
       const uiRecent = normalizeTransactions({ recentTransactions: json?.recentTransactions || [] }).slice(0, 5);
         if (!cancelled) setRecentUi(uiRecent);
     } catch (e) {
       console.error('LOAD DASHBOARD ERROR:', e);
-      if (!cancelled) setData(null);
+      if (!cancelled) {
+        setData(null);
+        setTransactions([]);
+      }
     } finally {
       if (!cancelled) setLoading(false);
     }
@@ -171,17 +209,37 @@ export function Dashboard() {
 
   const cards = data?.cards ?? [];
   const creditCards = cards.filter((c) => toNumber(c.credit_limit) > 0);
+  const debitCardIds = useMemo(
+    () => new Set(cards.filter((c) => toNumber(c.credit_limit) <= 0).map((c) => toId(c.id))),
+    [cards]
+  );
 
   const totalCreditLimit = creditCards.reduce((sum, c) => sum + toNumber(c.credit_limit), 0);
   const totalCreditUsed = creditCards.reduce((sum, c) => sum + toNumber(c.used_amount), 0);
   const creditUsagePercent = totalCreditLimit > 0 ? (totalCreditUsed / totalCreditLimit) * 100 : 0;
+  const totalDebitAvailable = useMemo(() => {
+    return transactions.reduce((sum, t) => {
+      const cardIdRaw = (t as any).card_id ?? (t as any).cardId ?? null;
+      if (!cardIdRaw) return sum;
+      const cardId = toId(cardIdRaw);
+      if (!debitCardIds.has(cardId)) return sum;
+
+      const amount = toNumber((t as any).amount);
+      const type = String((t as any).type || '').toUpperCase();
+      if (type === 'INCOME') return sum + amount;
+      if (type === 'EXPENSE') return sum - amount;
+      return sum;
+    }, 0);
+  }, [transactions, debitCardIds]);
 
   if (loading) {
     // sin romper estilos: mismo contenedor, solo placeholder
     return (
       <div className="dashboard-page max-w-7xl mx-auto p-4 lg:p-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-semibold text-[#1F2933] mb-2">Dashboard</h1>
+          <h1 className="text-3xl font-semibold text-[#1F2933] mb-2">
+            {userName ? `Welcome, ${userName}` : 'Welcome'}
+          </h1>
           <p className="text-[#64748B]">Loading…</p>
         </div>
       </div>
@@ -192,17 +250,18 @@ export function Dashboard() {
     <div className="dashboard-page max-w-7xl mx-auto p-4 lg:p-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-[#1F2933] mb-2">Dashboard</h1>
+        <h1 className="text-3xl font-semibold text-[#1F2933] mb-2">
+          {userName ? `Welcome, ${userName}` : 'Welcome'}
+        </h1>
         <p className="text-[#64748B]">Here's your financial overview for February</p>
       </div>
 
       {/* Available Card */}
-      <div className="bg-gradient-to-br from-[#2DD4BF] to-[#14B8A6] rounded-2xl p-6 lg:p-8 text-white mb-6 shadow-lg">
-        <div className="flex items-start justify-between mb-6">
+      <div className="bg-gradient-to-br from-[#2DD4BF] to-[#14B8A6] rounded-2xl p-6 text-white mb-6 shadow-lg">
+        <div className="flex items-start justify-between">
           <div>
             <p className="text-white/80 mb-2">Available</p>
-            <h2 className="text-4xl lg:text-5xl font-bold">${formatMoney(balance)}</h2>
-            <p className="text-white/80 text-sm mt-2">Available to spend</p>
+            <h2 className="text-4xl lg:text-5xl font-bold">${formatMoney(totalDebitAvailable)}</h2>
           </div>
           <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
             <Wallet className="w-6 h-6" />
@@ -347,3 +406,4 @@ export function Dashboard() {
     </div>
   );
 }
+

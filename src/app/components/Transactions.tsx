@@ -8,7 +8,9 @@ import { formatMoney } from "../utils/formatMoney";
 import "../../styles/components/Transactions.css";
 
 type FilterType = "all" | "income" | "expense";
-type UiTransactionRow = UiTransaction & { cardName?: string; cardId?: string };
+type UiTransactionRow = UiTransaction & { cardName?: string; cardId?: string; categoryIcon?: string };
+type ManagedCategory = { id: string; name: string; icon: string; type: "income" | "expense"; aliases?: string[] };
+const CATEGORY_STORAGE_KEY = "leofy_settings_categories_v1";
 
 type PaymentSource = {
   payment_method?: string | null;
@@ -84,6 +86,29 @@ export function Transactions() {
               ? data.recentTransactions
               : [];
 
+        const aliasToCurrent = new Map<string, { name: string; icon: string }>();
+        try {
+          const rawCategories = localStorage.getItem(CATEGORY_STORAGE_KEY);
+          const parsedCategories: ManagedCategory[] = rawCategories ? JSON.parse(rawCategories) : [];
+          if (Array.isArray(parsedCategories)) {
+            for (const c of parsedCategories) {
+              const currentName = String(c?.name || "").trim();
+              const currentIcon = String(c?.icon || "Circle");
+              if (!currentName) continue;
+              aliasToCurrent.set(currentName.toLowerCase(), { name: currentName, icon: currentIcon });
+              if (Array.isArray(c?.aliases)) {
+                for (const alias of c.aliases) {
+                  const aliasKey = String(alias || "").trim().toLowerCase();
+                  if (!aliasKey) continue;
+                  aliasToCurrent.set(aliasKey, { name: currentName, icon: currentIcon });
+                }
+              }
+            }
+          }
+        } catch {
+          // ignore local category mapping errors
+        }
+
         const cardsList: any[] = Array.isArray(cardsData) ? cardsData : [];
         const cardMethodById = new Map<string, string>();
         const cardNameById = new Map<string, string>();
@@ -110,12 +135,17 @@ export function Transactions() {
           }
         }
 
-        const normalized: UiTransactionRow[] = normalizeTransactions(data).map((tx) => ({
-          ...tx,
-          paymentMethod: paymentById.get(String(tx.id)) || tx.paymentMethod || "cash",
-          cardName: cardNameByTxId.get(String(tx.id)),
-          cardId: cardIdByTxId.get(String(tx.id)),
-        }));
+        const normalized: UiTransactionRow[] = normalizeTransactions(data).map((tx) => {
+          const mapped = aliasToCurrent.get(String(tx.category || "").trim().toLowerCase());
+          return {
+            ...tx,
+            category: mapped?.name || tx.category,
+            categoryIcon: mapped?.icon || undefined,
+            paymentMethod: paymentById.get(String(tx.id)) || tx.paymentMethod || "cash",
+            cardName: cardNameByTxId.get(String(tx.id)),
+            cardId: cardIdByTxId.get(String(tx.id)),
+          };
+        });
 
         if (!cancelled) setItems(normalized);
       } catch (e) {
@@ -232,7 +262,7 @@ export function Transactions() {
                     let IconComponent = LucideIcons.Circle;
 
                     try {
-                      const iconName = getCategoryIcon(transaction.category);
+                      const iconName = transaction.categoryIcon || getCategoryIcon(transaction.category);
                       IconComponent = getIconComponent(iconName);
                     } catch {
                       IconComponent = LucideIcons.Circle;

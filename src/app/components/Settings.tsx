@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { User, DollarSign, Download, Tag, LogOut, CreditCard } from "lucide-react";
+import { User, DollarSign, Download, Tag, LogOut, CreditCard, Pencil } from "lucide-react";
 import "../../styles/components/Settings.css";
 
 type MeResponse = {
   id: string | number;
-  name: string | null;
+  full_name: string | null;
   email: string;
   currency?: "MXN" | "USD";
 };
@@ -22,13 +22,10 @@ export function Settings() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [me, setMe] = useState<MeResponse | null>(null);
-
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [currency, setCurrency] = useState<"MXN" | "USD">("MXN");
-
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -61,8 +58,7 @@ export function Settings() {
 
       const data: MeResponse = await res.json();
       setMe(data);
-
-      setFullName(data.name ?? "");
+      setFullName(data.full_name ?? "");
       setEmail(data.email ?? "");
       if (data.currency) setCurrency(data.currency);
     } catch (e: any) {
@@ -86,8 +82,7 @@ export function Settings() {
         method: "PUT",
         headers: authHeaders,
         body: JSON.stringify({
-          name: fullName,
-          email,
+          full_name: fullName,
           currency,
         }),
       });
@@ -99,10 +94,24 @@ export function Settings() {
 
       const updated: MeResponse = await res.json();
       setMe(updated);
-
-      setFullName(updated.name ?? "");
+      setFullName(updated.full_name ?? "");
       setEmail(updated.email ?? "");
       if (updated.currency) setCurrency(updated.currency);
+
+      try {
+        const raw = localStorage.getItem("leofy_user");
+        const parsed = raw ? JSON.parse(raw) : {};
+        const nextUser = {
+          ...parsed,
+          ...updated,
+          full_name: updated.full_name ?? parsed?.full_name ?? "",
+          name: updated.full_name ?? parsed?.name ?? "",
+          email: updated.email ?? parsed?.email ?? "",
+        };
+        localStorage.setItem("leofy_user", JSON.stringify(nextUser));
+      } catch {
+        // ignore local cache sync errors
+      }
 
       setIsEditing(false);
     } catch (e: any) {
@@ -113,7 +122,7 @@ export function Settings() {
   }
 
   function onCancelEdit() {
-    setFullName(me?.name ?? "");
+    setFullName(me?.full_name ?? "");
     setEmail(me?.email ?? "");
     if (me?.currency) setCurrency(me.currency);
     setIsEditing(false);
@@ -149,10 +158,22 @@ export function Settings() {
       )}
 
       <div className="settings-card">
-        <h3 className="settings-section-title">
-          <User className="settings-section-icon" />
-          Profile
-        </h3>
+        <div className="settings-profile-head">
+          <h3 className="settings-section-title">
+            <User className="settings-section-icon" />
+            Profile
+          </h3>
+          {!isEditing && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="settings-profile-edit-btn"
+              title="Edit profile"
+            >
+              <Pencil className="settings-profile-edit-icon" />
+              Edit
+            </button>
+          )}
+        </div>
 
         <div className="settings-stack">
           <div>
@@ -172,21 +193,14 @@ export function Settings() {
             <input
               type="email"
               value={email}
-              readOnly={!isEditing}
-              disabled={!isEditing}
+              readOnly
+              disabled
               onChange={(e) => setEmail(e.target.value)}
               className="settings-input"
             />
           </div>
 
-          {!isEditing ? (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="settings-primary-btn"
-            >
-              Editar
-            </button>
-          ) : (
+          {isEditing ? (
             <div className="settings-button-row">
               <button
                 onClick={onSaveProfile}
@@ -203,7 +217,7 @@ export function Settings() {
                 Cancel
               </button>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -249,23 +263,14 @@ export function Settings() {
           Categories
         </h3>
         <p className="settings-text settings-text-gap">
-          Manage your transaction categories to better organize your finances.
+          Manage your categories in a dedicated tab to keep Settings clean.
         </p>
-        <div className="settings-category-list">
-          <div className="settings-category-row">
-            <span className="settings-category-name">Food & Dining</span>
-            <span className="settings-category-meta">15 transactions</span>
-          </div>
-          <div className="settings-category-row">
-            <span className="settings-category-name">Shopping</span>
-            <span className="settings-category-meta">8 transactions</span>
-          </div>
-          <div className="settings-category-row">
-            <span className="settings-category-name">Transport</span>
-            <span className="settings-category-meta">12 transactions</span>
-          </div>
-        </div>
-        <button className="settings-link-btn">+ Add New Category</button>
+        <Link
+          to="/settings/categories"
+          className="settings-manage-link"
+        >
+          Open Categories
+        </Link>
       </div>
 
       <div className="settings-card">

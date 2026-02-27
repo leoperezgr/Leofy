@@ -55,6 +55,12 @@ function getCategoryName(tx: ApiTx) {
   return 'Uncategorized';
 }
 
+function niceCeil(n: number) {
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  const pow = Math.pow(10, Math.floor(Math.log10(n)));
+  return Math.ceil(n / pow) * pow;
+}
+
 function colorToGradient(color?: string | null) {
   switch ((color || 'OTHER').toUpperCase()) {
     case 'RED':
@@ -191,6 +197,29 @@ export function Statistics() {
   const savings = incomeTotal - expensesTotal;
   const savingsRate = incomeTotal > 0 ? (savings / incomeTotal) * 100 : 0;
   const COLORS = ['#2DD4BF', '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981'];
+  const spendingByCategoryChartData = useMemo(
+    () =>
+      spendingByCategory
+        .map((d) => {
+          const value = Number((d as any).value);
+          const safeValue = Number.isFinite(value) ? value : 0;
+          return {
+            ...d,
+            name: typeof d.name === 'string' ? d.name.trim() : '',
+            value: safeValue,
+          };
+        })
+        .filter((d) => d.name.length > 0),
+    [spendingByCategory]
+  );
+  const spendingByCategoryMax = useMemo(
+    () => Math.max(...spendingByCategoryChartData.map((d) => d.value), 0),
+    [spendingByCategoryChartData]
+  );
+  const spendingByCategoryYMax = useMemo(() => {
+    const yMax = niceCeil(spendingByCategoryMax);
+    return yMax > 0 ? yMax : 1;
+  }, [spendingByCategoryMax]);
 
   if (loading) {
     return (
@@ -280,7 +309,7 @@ export function Statistics() {
         <div className="stats-card">
           <h3 className="stats-card-title">Spending by Category</h3>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={spendingByCategory}>
+            <BarChart data={spendingByCategoryChartData} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
               <XAxis
                 dataKey="name"
                 angle={-45}
@@ -289,9 +318,15 @@ export function Statistics() {
                 stroke="#94A3B8"
                 style={{ fontSize: '12px' }}
               />
-              <YAxis stroke="#94A3B8" style={{ fontSize: '12px' }} />
+              <YAxis
+                stroke="#94A3B8"
+                style={{ fontSize: '12px' }}
+                domain={[0, spendingByCategoryYMax]}
+                allowDecimals={false}
+                tickFormatter={(v: number) => `$${formatMoney(toNumber(v))}`}
+              />
               <Tooltip
-                formatter={(value: number) => `$${value.toFixed(2)}`}
+                formatter={(value: number | string) => [`$${formatMoney(toNumber(value))}`, '']}
                 contentStyle={{
                   backgroundColor: '#fff',
                   border: '1px solid #E2E8F0',
@@ -300,13 +335,13 @@ export function Statistics() {
                 }}
               />
               <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                {spendingByCategory.map((_, index) => (
+                {spendingByCategoryChartData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
                 <LabelList
                   dataKey="value"
                   position="top"
-                  formatter={(value: number) => `$${formatMoney(toNumber(value))}`}
+                  formatter={(value: number | string) => `$${formatMoney(toNumber(value))}`}
                   style={{ fill: '#1F2933', fontSize: 11, fontWeight: 500 }}
                 />
               </Bar>

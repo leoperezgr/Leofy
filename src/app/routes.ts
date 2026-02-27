@@ -5,9 +5,12 @@ import { Login } from "./components/Login";
 import { Dashboard } from "./components/Dashboard";
 import { Transactions } from "./components/Transactions";
 import { CreditCards } from "./components/CreditCards";
+import { DebitCards } from "./components/DebitCards";
 import { CardDetail } from "./components/CardDetail";
+import { CreditCardDetail } from "./components/CreditCardDetail";
 import { Statistics } from "./components/Statistics";
 import { Settings } from "./components/Settings";
+import { SettingsCategories } from "./components/SettingsCategories";
 import { ManageCards } from "./components/ManageCards";
 import { TransactionDetail } from "./components/TransactionDetail";
 
@@ -50,10 +53,13 @@ export const router = createBrowserRouter([
       { path: "transactions", Component: Transactions },
       { path: "transactions/:transactionId", Component: TransactionDetail },
       { path: "cards", Component: CreditCards },
+      { path: "debit-cards", Component: DebitCards },
+      { path: "debit-cards/:cardId", Component: CardDetail },
       { path: "cards/manage", Component: ManageCards },
-      { path: "cards/:cardId", Component: CardDetail },
+      { path: "cards/:cardId", Component: CreditCardDetail },
       { path: "statistics", Component: Statistics },
       { path: "settings", Component: Settings },
+      { path: "settings/categories", Component: SettingsCategories },
     ],
   },
 ]);

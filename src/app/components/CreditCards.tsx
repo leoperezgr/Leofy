@@ -171,6 +171,10 @@ export function CreditCards() {
     const totalLimit = uiCards.reduce((sum, c) => sum + c.creditLimit, 0);
     return { totalUsed, totalLimit };
   }, [uiCards]);
+  const usagePercent = totals.totalLimit > 0 ? (totals.totalUsed / totals.totalLimit) * 100 : 0;
+  const clampedUsagePercent = Math.min(Math.max(usagePercent, 0), 100);
+  const isHighGlobalUsage = usagePercent > 80;
+  const totalAvailable = Math.max(totals.totalLimit - totals.totalUsed, 0);
 
   return (
     <div className="cc-page">
@@ -200,6 +204,30 @@ export function CreditCards() {
           <p className="cc-summary-value">
             ${formatMoney(totals.totalLimit)}
           </p>
+        </div>
+      </div>
+
+      <div className="cc-summary-card cc-global-usage-card">
+        <div className="cc-usage-header">
+          <span className="cc-card-label">Total Usage</span>
+          <div className="cc-usage-right">
+            <span className={`cc-usage-percent ${isHighGlobalUsage ? "cc-usage-high" : "cc-usage-normal"}`}>
+              {usagePercent.toFixed(0)}%
+            </span>
+          </div>
+        </div>
+        <div className="cc-usage-track cc-usage-track-interactive">
+          <div
+            className={`cc-usage-fill ${isHighGlobalUsage ? "cc-usage-fill-high" : "cc-usage-fill-normal"}`}
+            style={{ width: `${clampedUsagePercent}%` }}
+          >
+            <span className="cc-usage-shimmer" />
+          </div>
+          <span className="cc-usage-marker" style={{ left: `calc(${clampedUsagePercent}% - 0.5rem)` }} />
+        </div>
+        <div className="cc-global-usage-footer">
+          <span className="cc-card-label">Used: ${formatMoney(totals.totalUsed)}</span>
+          <span className="cc-card-label">Available: ${formatMoney(totalAvailable)}</span>
         </div>
       </div>
 
