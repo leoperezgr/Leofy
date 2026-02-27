@@ -1,23 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
-import { getCategoryIcon } from '../utils/mockData';
-import { UiTransaction, normalizeTransactions } from '../utils/transactionsMapper';
-import * as LucideIcons from 'lucide-react';
-import { formatMoney } from '../utils/formatMoney';
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Search, Pencil } from "lucide-react";
+import { getCategoryIcon } from "../utils/mockData";
+import { UiTransaction, normalizeTransactions } from "../utils/transactionsMapper";
+import * as LucideIcons from "lucide-react";
+import { formatMoney } from "../utils/formatMoney";
+import "../../styles/components/Transactions.css";
 
-
-type FilterType = 'all' | 'income' | 'expense';
+type FilterType = "all" | "income" | "expense";
 
 export function Transactions() {
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
-  const [filter, setFilter] = useState<FilterType>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<FilterType>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [items, setItems] = useState<UiTransaction[]>([]);
   const [loading, setLoading] = useState(true);
 
   const authHeaders = (): Record<string, string> => {
-    const token = localStorage.getItem('leofy_token');
+    const token = localStorage.getItem("leofy_token");
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
@@ -31,7 +32,7 @@ export function Transactions() {
         const res = await fetch(`${API_BASE}/api/transactions`, {
           headers: {
             ...authHeaders(),
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
         });
 
@@ -42,12 +43,10 @@ export function Transactions() {
           throw new Error(msg);
         }
 
-      const normalized: UiTransaction[] = normalizeTransactions(data);
+        const normalized: UiTransaction[] = normalizeTransactions(data);
         if (!cancelled) setItems(normalized);
-
-        
       } catch (e) {
-        console.error('LOAD TRANSACTIONS ERROR:', e);
+        console.error("LOAD TRANSACTIONS ERROR:", e);
         if (!cancelled) setItems([]);
       } finally {
         if (!cancelled) setLoading(false);
@@ -68,8 +67,8 @@ export function Transactions() {
         if (!q) return true;
 
         return (
-          (t.description || '').toLowerCase().includes(q) ||
-          (t.category || '').toLowerCase().includes(q)
+          (t.description || "").toLowerCase().includes(q) ||
+          (t.category || "").toLowerCase().includes(q)
         );
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -90,10 +89,10 @@ export function Transactions() {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) return 'Today';
-    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    if (date.toDateString() === today.toDateString()) return "Today";
+    if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
 
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
   const getIconComponent = (iconName: string) => {
@@ -102,78 +101,60 @@ export function Transactions() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-4 lg:p-8">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-semibold text-[#1F2933] mb-2">Transactions</h1>
-        <p className="text-[#64748B]">Track all your income and expenses</p>
+    <div className="tx-page">
+      <div className="tx-header">
+        <h1 className="tx-title">Transactions</h1>
+        <p className="tx-subtitle">Track all your income and expenses</p>
       </div>
 
-      {/* Search and Filter */}
-      <div className="mb-6 space-y-4">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#64748B]" />
+      <div className="tx-toolbar">
+        <div className="tx-search-wrap">
+          <Search className="tx-search-icon" />
           <input
             type="text"
             placeholder="Search transactions..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF] focus:border-transparent"
+            className="tx-search-input"
           />
         </div>
 
-        <div className="flex gap-2">
+        <div className="tx-filter-row">
           <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-xl font-medium transition-colors ${
-              filter === 'all'
-                ? 'bg-[#2DD4BF] text-white'
-                : 'bg-white text-[#64748B] border border-gray-200'
-            }`}
+            onClick={() => setFilter("all")}
+            className={`tx-filter-btn ${filter === "all" ? "tx-filter-btn-all-active" : "tx-filter-btn-inactive"}`}
           >
             All
           </button>
           <button
-            onClick={() => setFilter('income')}
-            className={`px-4 py-2 rounded-xl font-medium transition-colors ${
-              filter === 'income'
-                ? 'bg-green-500 text-white'
-                : 'bg-white text-[#64748B] border border-gray-200'
-            }`}
+            onClick={() => setFilter("income")}
+            className={`tx-filter-btn ${filter === "income" ? "tx-filter-btn-income-active" : "tx-filter-btn-inactive"}`}
           >
             Income
           </button>
           <button
-            onClick={() => setFilter('expense')}
-            className={`px-4 py-2 rounded-xl font-medium transition-colors ${
-              filter === 'expense'
-                ? 'bg-red-500 text-white'
-                : 'bg-white text-[#64748B] border border-gray-200'
-            }`}
+            onClick={() => setFilter("expense")}
+            className={`tx-filter-btn ${filter === "expense" ? "tx-filter-btn-expense-active" : "tx-filter-btn-inactive"}`}
           >
             Expenses
           </button>
         </div>
       </div>
 
-      {/* Loading state */}
       {loading && (
-        <div className="text-center py-12">
-          <p className="text-[#64748B]">Loading transactions…</p>
+        <div className="tx-state-box">
+          <p className="tx-muted">Loading transactions...</p>
         </div>
       )}
 
-      {/* Transactions List */}
       {!loading && (
         <>
-          <div className="space-y-6">
+          <div className="tx-groups">
             {Object.entries(groupedTransactions).map(([date, dayTransactions]) => (
               <div key={date}>
-                <h3 className="text-sm font-semibold text-[#64748B] mb-3 px-2">
-                  {formatDate(date)}
-                </h3>
+                <h3 className="tx-group-date">{formatDate(date)}</h3>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="tx-day-card">
                   {dayTransactions.map((transaction, index) => {
                     let IconComponent = LucideIcons.Circle;
 
@@ -187,46 +168,41 @@ export function Transactions() {
                     return (
                       <div
                         key={transaction.id}
-                        className={`flex items-center justify-between p-4 ${
-                          index !== dayTransactions.length - 1 ? 'border-b border-gray-50' : ''
-                        }`}
+                        className={`group tx-row ${index !== dayTransactions.length - 1 ? "tx-row-divider" : ""}`}
                       >
-                        <div className="flex items-center gap-3 flex-1">
+                        <div className="tx-row-left">
                           <div
-                            className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                              transaction.type === 'income' ? 'bg-green-50' : 'bg-gray-50'
-                            }`}
+                            className={`tx-icon-wrap ${transaction.type === "income" ? "tx-icon-wrap-income" : "tx-icon-wrap-expense"}`}
                           >
                             <IconComponent
-                              className={`w-6 h-6 ${
-                                transaction.type === 'income' ? 'text-green-600' : 'text-[#64748B]'
-                              }`}
+                              className={`tx-icon ${transaction.type === "income" ? "tx-icon-income" : "tx-icon-expense"}`}
                             />
                           </div>
 
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-[#1F2933] truncate">
-                              {transaction.description || '—'}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-sm text-[#64748B]">{transaction.category}</span>
-                              <span className="text-xs text-[#94A3B8]">•</span>
-                              <span className="text-sm text-[#64748B] capitalize">
-                                {transaction.paymentMethod}
-                              </span>
+                          <div className="tx-main">
+                            <p className="tx-description">{transaction.description || "-"}</p>
+                            <div className="tx-meta-row">
+                              <span className="tx-meta-text">{transaction.category}</span>
+                              <span className="tx-dot">|</span>
+                              <span className="tx-meta-text tx-meta-capitalize">{transaction.paymentMethod}</span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="text-right">
+                        <div className="tx-right">
                           <p
-                            className={`text-lg font-semibold ${
-                              transaction.type === 'income' ? 'text-green-600' : 'text-[#1F2933]'
-                            }`}
+                            className={`tx-amount ${transaction.type === "income" ? "tx-amount-income" : "tx-amount-expense"}`}
                           >
-                            {transaction.type === 'income' ? '+' : '-'}$
-                            {formatMoney(transaction.amount)}
+                            {transaction.type === "income" ? "+" : "-"}${formatMoney(transaction.amount)}
                           </p>
+                          <Link
+                            to={`/transactions/${transaction.id}`}
+                            className="w-8 h-8 rounded-full bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                            aria-label="Edit transaction"
+                            title="Edit transaction"
+                          >
+                            <Pencil className="w-4 h-4 text-[#64748B]" />
+                          </Link>
                         </div>
                       </div>
                     );
@@ -237,8 +213,8 @@ export function Transactions() {
           </div>
 
           {filteredTransactions.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-[#64748B]">No transactions found</p>
+            <div className="tx-state-box">
+              <p className="tx-muted">No transactions found</p>
             </div>
           )}
         </>

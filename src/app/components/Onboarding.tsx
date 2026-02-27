@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router';
 import { ArrowRight, TrendingUp, Shield, Sparkles } from 'lucide-react';
+import '../../styles/components/Onboarding.css';
 
 export function Onboarding() {
   const navigate = useNavigate();
@@ -10,7 +11,7 @@ export function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#2DD4BF] via-[#14B8A6] to-[#0D9488] flex items-center justify-center p-4">
+    <div className="onboarding-page min-h-screen bg-gradient-to-br from-[#2DD4BF] via-[#14B8A6] to-[#0D9488] flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-12">

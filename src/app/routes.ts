@@ -9,6 +9,7 @@ import { CardDetail } from "./components/CardDetail";
 import { Statistics } from "./components/Statistics";
 import { Settings } from "./components/Settings";
 import { ManageCards } from "./components/ManageCards";
+import { TransactionDetail } from "./components/TransactionDetail";
 
 // ✅ Flags reales
 const hasOnboarded = () => localStorage.getItem("leofy_onboarded") === "true";
@@ -47,6 +48,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: Dashboard },
       { path: "transactions", Component: Transactions },
+      { path: "transactions/:transactionId", Component: TransactionDetail },
       { path: "cards", Component: CreditCards },
       { path: "cards/manage", Component: ManageCards },
       { path: "cards/:cardId", Component: CardDetail },

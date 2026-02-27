@@ -1,0 +1,244 @@
+.settings-page {
+  margin: 0 auto;
+  max-width: 80rem;
+  padding: 1rem;
+}
+
+.settings-header {
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.settings-title {
+  margin-bottom: 0.5rem;
+  color: #1f2933;
+  font-size: 1.875rem;
+  font-weight: 600;
+}
+
+.settings-subtitle,
+.settings-text,
+.settings-category-meta,
+.settings-about-version,
+.settings-about-text {
+  color: #64748b;
+}
+
+.settings-logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+  padding: 0.5rem 1rem;
+  color: #1f2933;
+  font-weight: 500;
+  transition: background-color 150ms ease;
+}
+
+.settings-logout-btn:hover,
+.settings-secondary-btn:hover,
+.settings-export-btn:hover,
+.settings-category-row:hover {
+  background: #f3f4f6;
+}
+
+.settings-logout-icon,
+.settings-section-icon {
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
+.settings-status-box,
+.settings-card {
+  margin-bottom: 1.5rem;
+  border: 1px solid #f3f4f6;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1.5rem;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+}
+
+.settings-error-text {
+  color: #dc2626;
+  font-size: 0.875rem;
+}
+
+.settings-loading-text {
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.settings-section-title,
+.settings-about-title {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #1f2933;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.settings-about-title {
+  display: block;
+}
+
+.settings-stack,
+.settings-category-list,
+.settings-about-links {
+  display: grid;
+  gap: 1rem;
+}
+
+.settings-label {
+  margin-bottom: 0.5rem;
+  display: block;
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.settings-input {
+  width: 100%;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+  padding: 0.75rem 1rem;
+}
+
+.settings-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #2dd4bf;
+}
+
+.settings-button-row,
+.settings-export-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.settings-primary-btn,
+.settings-secondary-btn,
+.settings-export-btn,
+.settings-manage-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.75rem;
+  padding: 0.5rem 1.5rem;
+  font-weight: 500;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.settings-primary-btn,
+.settings-manage-link {
+  background: #2dd4bf;
+  color: #fff;
+}
+
+.settings-primary-btn:hover,
+.settings-manage-link:hover,
+.settings-link-btn:hover,
+.settings-about-link:hover {
+  background: #14b8a6;
+  color: #fff;
+}
+
+.settings-secondary-btn,
+.settings-export-btn {
+  background: #f9fafb;
+  color: #1f2933;
+}
+
+.settings-text-gap {
+  margin-bottom: 1rem;
+}
+
+.settings-manage-link {
+  padding: 0.75rem 1.5rem;
+}
+
+.settings-category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+  padding: 0.75rem;
+  transition: background-color 150ms ease;
+}
+
+.settings-category-name,
+.settings-about-name {
+  color: #1f2933;
+  font-weight: 500;
+}
+
+.settings-category-meta {
+  font-size: 0.75rem;
+}
+
+.settings-link-btn,
+.settings-about-link {
+  display: inline-block;
+  border: 0;
+  background: transparent;
+  color: #2dd4bf;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.settings-link-btn {
+  margin-top: 1rem;
+  padding: 0;
+}
+
+.settings-about-head {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.settings-about-logo {
+  display: flex;
+  height: 3rem;
+  width: 3rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #2dd4bf, #14b8a6);
+}
+
+.settings-about-logo-letter {
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.settings-about-text {
+  line-height: 1.625;
+}
+
+.settings-about-links {
+  margin-top: 1.5rem;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 1.5rem;
+  gap: 0.5rem;
+}
+
+.settings-card-last {
+  margin-bottom: 0;
+}
+
+@media (min-width: 1024px) {
+  .settings-page {
+    padding: 2rem;
+  }
+}

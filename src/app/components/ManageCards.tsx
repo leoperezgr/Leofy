@@ -5,6 +5,7 @@ import { formatMoney } from "../utils/formatMoney";
 import visaLogo from "../../assets/brands/visa.svg";
 import mastercardLogo from "../../assets/brands/mastercard.svg";
 import amexLogo from "../../assets/brands/amex.svg";
+import "../../styles/components/ManageCards.css";
 
 type CardColor =
   | "RED"
@@ -285,7 +286,7 @@ export function ManageCards() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 lg:p-8">
+    <div className="manage-cards-page max-w-7xl mx-auto p-4 lg:p-8">
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
