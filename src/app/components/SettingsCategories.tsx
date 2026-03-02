@@ -19,10 +19,13 @@ const CATEGORY_STORAGE_KEY = "leofy_settings_categories_v1";
 const ICON_OPTIONS = [
   "Tag",
   "ShoppingCart",
+  "Utensils",
   "UtensilsCrossed",
+  "Coffee",
   "Store",
   "Car",
   "ShoppingBag",
+  "Receipt",
   "Heart",
   "Film",
   "Laptop",
@@ -30,6 +33,16 @@ const ICON_OPTIONS = [
   "TrendingUp",
   "MoreHorizontal",
 ] as const;
+
+const DEFAULT_EXPENSE_CATEGORIES: Array<Pick<ManagedCategory, "name" | "icon" | "type">> = [
+  { name: "Groceries", icon: "ShoppingCart", type: "expense" },
+  { name: "Dining", icon: "Utensils", type: "expense" },
+  { name: "Coffee", icon: "Coffee", type: "expense" },
+  { name: "Transportation", icon: "Car", type: "expense" },
+  { name: "Shopping", icon: "ShoppingBag", type: "expense" },
+  { name: "Bills & Subscriptions", icon: "Receipt", type: "expense" },
+  { name: "Health & Personal", icon: "Heart", type: "expense" },
+];
 
 export function SettingsCategories() {
   const token = useMemo(() => localStorage.getItem("leofy_token") || "", []);
@@ -55,14 +68,18 @@ export function SettingsCategories() {
   };
 
   const defaultManagedCategories = useMemo<ManagedCategory[]>(
-    () =>
-      baseCategories.map((c, idx) => ({
+    () => {
+      const defaultIncomeCategories = baseCategories.filter((c) => c.type === "income");
+      const combined = [...DEFAULT_EXPENSE_CATEGORIES, ...defaultIncomeCategories];
+
+      return combined.map((c, idx) => ({
         id: `base-${idx}-${c.name.toLowerCase().replace(/\s+/g, "-")}`,
         name: c.name,
         icon: c.icon,
         type: c.type,
         aliases: [],
-      })),
+      }));
+    },
     []
   );
 

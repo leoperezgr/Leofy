@@ -226,6 +226,10 @@ export function TransactionDetail() {
 
     const amountNum = Number(amount);
     if (!Number.isFinite(amountNum) || amountNum <= 0) return alert("Please enter a valid amount");
+    const occurredAt =
+      rawTx?.occurred_at ||
+      rawTx?.created_at ||
+      (tx.date ? new Date(tx.date).toISOString() : new Date().toISOString());
 
     try {
       setSaving(true);
@@ -239,7 +243,7 @@ export function TransactionDetail() {
         amount: amountNum,
         description: desc,
         category: finalCategory,
-        date: tx.date ? new Date(tx.date).toISOString() : new Date().toISOString(),
+        occurred_at: occurredAt,
         paymentMethod,
         card_id: paymentMethod === "cash" ? null : cardId || null,
       };

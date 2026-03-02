@@ -1,4 +1,255 @@
 .dashboard-page {
   margin: 0 auto;
   max-width: 80rem;
+  position: relative;
+  isolation: isolate;
+}
+
+.dashboard-page::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 18rem;
+  z-index: -1;
+  border-radius: 2rem;
+  background:
+    radial-gradient(circle at top left, rgba(45, 212, 191, 0.16), transparent 42%),
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.1), transparent 34%);
+  pointer-events: none;
+}
+
+.dashboard-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dashboard-header-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dashboard-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem;
+  border-radius: 9999px;
+  padding: 0.5rem 0.9rem;
+  background: rgba(45, 212, 191, 0.12);
+  color: #0f766e;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.dashboard-badge-muted {
+  background: rgba(148, 163, 184, 0.12);
+  color: #475569;
+}
+
+.dashboard-hero {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 24px 48px -24px rgba(20, 184, 166, 0.55);
+}
+
+.dashboard-hero::after {
+  content: '';
+  position: absolute;
+  top: -20%;
+  right: -6%;
+  width: 12rem;
+  height: 12rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.28), transparent 62%);
+  pointer-events: none;
+}
+
+.dashboard-hero-caption {
+  margin-top: 0.5rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.dashboard-hero-icon {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+}
+
+.dashboard-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 24px 40px -28px rgba(15, 23, 42, 0.22);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.dashboard-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.7));
+  pointer-events: none;
+}
+
+.dashboard-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-panel:hover {
+  transform: translateY(-2px);
+  border-color: rgba(148, 163, 184, 0.45);
+  box-shadow: 0 30px 48px -28px rgba(15, 23, 42, 0.28);
+}
+
+.dashboard-panel-muted {
+  box-shadow: 0 18px 36px -28px rgba(15, 23, 42, 0.16);
+}
+
+.dashboard-segmented {
+  padding: 0.35rem;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+}
+
+.dashboard-segment {
+  border: 1px solid transparent;
+  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.dashboard-segment:hover {
+  transform: translateY(-1px);
+}
+
+.dashboard-segment-active {
+  box-shadow: 0 12px 24px -14px rgba(20, 184, 166, 0.9);
+}
+
+.dashboard-custom-range input {
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.dashboard-balance-icon {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.dashboard-metric-tile {
+  position: relative;
+  overflow: hidden;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.dashboard-metric-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), transparent 60%);
+  pointer-events: none;
+}
+
+.dashboard-metric-tile:hover {
+  transform: translateY(-1px);
+  border-color: rgba(45, 212, 191, 0.35);
+  box-shadow: 0 16px 28px -24px rgba(15, 23, 42, 0.26);
+}
+
+.dashboard-metric-label {
+  color: #334155;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.dashboard-metric-income {
+  background: linear-gradient(180deg, #ecfdf5 0%, #dcfce7 100%);
+  border-color: #86efac;
+}
+
+.dashboard-metric-expense {
+  background: linear-gradient(180deg, #fff1f2 0%, #ffe4e6 100%);
+  border-color: #fda4af;
+}
+
+.dashboard-metric-income::after,
+.dashboard-metric-expense::after {
+  display: none;
+}
+
+.dashboard-metric-income:hover {
+  border-color: #22c55e;
+  box-shadow: 0 16px 28px -24px rgba(34, 197, 94, 0.35);
+}
+
+.dashboard-metric-expense:hover {
+  border-color: #f43f5e;
+  box-shadow: 0 16px 28px -24px rgba(244, 63, 94, 0.32);
+}
+
+.dashboard-metric-label-income {
+  color: #166534;
+}
+
+.dashboard-metric-label-expense {
+  color: #9f1239;
+}
+
+.dashboard-credit-progress {
+  box-shadow: 0 0 18px rgba(59, 130, 246, 0.24);
+}
+
+.dashboard-mini-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.dashboard-mini-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), transparent 55%);
+  pointer-events: none;
+}
+
+.dashboard-mini-card:hover {
+  transform: translateY(-1px) scale(1.01);
+  box-shadow: 0 16px 24px -20px rgba(15, 23, 42, 0.4);
+}
+
+.dashboard-transaction-row {
+  border-radius: 1rem;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.dashboard-transaction-row:hover {
+  background: rgba(248, 250, 252, 0.95);
+  transform: translateX(2px);
+}
+
+.dashboard-transaction-icon {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+@media (max-width: 768px) {
+  .dashboard-page::before {
+    height: 13rem;
+  }
+
+  .dashboard-header {
+    align-items: stretch;
+  }
+
+  .dashboard-header-badges {
+    width: 100%;
+  }
+
 }

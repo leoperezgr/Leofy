@@ -1,7 +1,7 @@
 ﻿// src/components/ManageCards.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { CreditCard, Plus, Pencil, Trash2, X, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
+import { CreditCard, Plus, Pencil, Trash2, X, ArrowUpDown, GripVertical } from "lucide-react";
 import { formatMoney } from "../utils/formatMoney";
 import { applyCardOrder, persistCardOrder } from "../utils/cardOrder";
 import { LoadingScreen } from "./LoadingScreen";
@@ -152,6 +152,8 @@ export function ManageCards() {
     };
   }, [location.state]);
   const [reorderMode, setReorderMode] = useState(false);
+  const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
+  const [dropTargetCardId, setDropTargetCardId] = useState<string | null>(null);
   const [didAutoOpenRequestedCard, setDidAutoOpenRequestedCard] = useState(false);
   const [didApplyRequestedReorder, setDidApplyRequestedReorder] = useState(false);
 
@@ -233,7 +235,13 @@ export function ManageCards() {
     setDidApplyRequestedReorder(true);
   }, [didApplyRequestedReorder, requestedReorder]);
 
-  function moveVisibleCard(cardId: string, direction: "up" | "down") {
+  useEffect(() => {
+    if (reorderMode) return;
+    setDraggingCardId(null);
+    setDropTargetCardId(null);
+  }, [reorderMode]);
+
+  function moveVisibleCardToIndex(cardId: string, targetCardId: string) {
     setItems((prev) => {
       const isVisible = (card: Card) => {
         if (filter === "all") return true;
@@ -243,16 +251,14 @@ export function ManageCards() {
 
       const visibleIds = prev.filter(isVisible).map((card) => String(card.id));
       const fromIndex = visibleIds.indexOf(String(cardId));
+      const toIndex = visibleIds.indexOf(String(targetCardId));
       if (fromIndex < 0) return prev;
-
-      const toIndex = direction === "up" ? fromIndex - 1 : fromIndex + 1;
       if (toIndex < 0 || toIndex >= visibleIds.length) return prev;
+      if (fromIndex === toIndex) return prev;
 
       const reorderedVisibleIds = [...visibleIds];
-      [reorderedVisibleIds[fromIndex], reorderedVisibleIds[toIndex]] = [
-        reorderedVisibleIds[toIndex],
-        reorderedVisibleIds[fromIndex],
-      ];
+      const [movedId] = reorderedVisibleIds.splice(fromIndex, 1);
+      reorderedVisibleIds.splice(toIndex, 0, movedId);
 
       const byId = new Map(prev.map((card) => [String(card.id), card]));
       const next = [...prev];
@@ -269,6 +275,39 @@ export function ManageCards() {
       return next;
     });
   }
+
+  const handleDragStart = (cardId: string, event: React.DragEvent<HTMLDivElement>) => {
+    if (!reorderMode) return;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", cardId);
+    setDraggingCardId(cardId);
+    setDropTargetCardId(cardId);
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!reorderMode) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDragEnter = (cardId: string) => {
+    if (!reorderMode) return;
+    if (!draggingCardId || draggingCardId === cardId) return;
+    setDropTargetCardId(cardId);
+  };
+
+  const handleDrop = (targetCardId: string, event: React.DragEvent<HTMLDivElement>) => {
+    if (!reorderMode) return;
+    event.preventDefault();
+    if (!draggingCardId || draggingCardId === targetCardId) return;
+    moveVisibleCardToIndex(draggingCardId, targetCardId);
+    setDropTargetCardId(targetCardId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingCardId(null);
+    setDropTargetCardId(null);
+  };
 
   async function onDelete(card: Card) {
     const ok = confirm(`Delete "${card.name}"? This cannot be undone.`);
@@ -456,7 +495,7 @@ export function ManageCards() {
         </div>
         {reorderMode && (
           <p className="mt-2 text-sm text-[#0F766E]">
-            Use the arrows to move cards and set your preferred order.
+            Drag cards to set your preferred order.
           </p>
         )}
       </div>
@@ -475,8 +514,20 @@ export function ManageCards() {
             return (
               <div
                 key={card.id}
+                draggable={reorderMode}
+                onDragStart={(event) => handleDragStart(String(card.id), event)}
+                onDragOver={handleDragOver}
+                onDragEnter={() => handleDragEnter(String(card.id))}
+                onDrop={(event) => handleDrop(String(card.id), event)}
+                onDragEnd={handleDragEnd}
                 className={`flex items-center justify-between p-4 ${
                   idx !== filtered.length - 1 ? "border-b border-gray-50" : ""
+                } ${reorderMode ? "mc-row-reorder" : ""} ${
+                  reorderMode && draggingCardId === String(card.id) ? "mc-row-dragging" : ""
+                } ${
+                  reorderMode && dropTargetCardId === String(card.id) && draggingCardId !== String(card.id)
+                    ? "mc-row-drop-target"
+                    : ""
                 }`}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -510,23 +561,8 @@ export function ManageCards() {
                 </div>
 
                 {reorderMode ? (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => moveVisibleCard(String(card.id), "up")}
-                      disabled={idx === 0}
-                      className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      title="Move up"
-                    >
-                      <ChevronUp className="w-4 h-4 text-[#64748B]" />
-                    </button>
-                    <button
-                      onClick={() => moveVisibleCard(String(card.id), "down")}
-                      disabled={idx === filtered.length - 1}
-                      className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      title="Move down"
-                    >
-                      <ChevronDown className="w-4 h-4 text-[#64748B]" />
-                    </button>
+                  <div className="flex items-center gap-2 text-[#64748B]" title="Drag to reorder">
+                    <GripVertical className="w-5 h-5" />
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">

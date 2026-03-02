@@ -9,6 +9,10 @@ type ApiTx = {
   type: 'INCOME' | 'EXPENSE' | 'income' | 'expense';
   amount: number | string;
   card_id?: string | number | null;
+  cardId?: string | number | null;
+  occurred_at?: string;
+  created_at?: string;
+  date?: string;
   metadata?: any;
   category?: string | null;
 };
@@ -17,6 +21,7 @@ type ApiCard = {
   id: string | number;
   name: string;
   credit_limit?: number | string | null;
+  closing_day?: number | string | null;
   color?: string | null;
 };
 
@@ -25,6 +30,8 @@ type SpendingByCategoryItem = {
   value: number;
   transactions: number;
 };
+
+type Period = 'month' | 'week' | '30days' | 'year' | 'custom';
 
 function toNumber(v: unknown) {
   const n = typeof v === 'string' ? Number(v) : Number(v ?? 0);
@@ -62,6 +69,137 @@ function niceCeil(n: number) {
   return Math.ceil(n / pow) * pow;
 }
 
+function startOfDay(d: Date) {
+  const next = new Date(d);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function endOfDay(d: Date) {
+  const next = new Date(d);
+  next.setHours(23, 59, 59, 999);
+  return next;
+}
+
+function startOfMonth(d: Date) {
+  return startOfDay(new Date(d.getFullYear(), d.getMonth(), 1));
+}
+
+function startOfWeek(d: Date) {
+  const next = startOfDay(d);
+  const diff = (next.getDay() + 6) % 7;
+  next.setDate(next.getDate() - diff);
+  return next;
+}
+
+function startOfYear(d: Date) {
+  return startOfDay(new Date(d.getFullYear(), 0, 1));
+}
+
+function addDays(d: Date, n: number) {
+  const next = new Date(d);
+  next.setDate(next.getDate() + n);
+  return next;
+}
+
+function addMonths(d: Date, n: number) {
+  const next = new Date(d);
+  next.setMonth(next.getMonth() + n);
+  return next;
+}
+
+function safeDayInMonth(year: number, monthIndex0: number, day: number) {
+  const normalizedDay = Math.max(1, Math.trunc(day || 1));
+  const lastDay = new Date(year, monthIndex0 + 1, 0).getDate();
+  return new Date(year, monthIndex0, Math.min(normalizedDay, lastDay));
+}
+
+function diffMonths(a: Date, b: Date) {
+  return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+}
+
+function parseInputDate(value: string | null | undefined) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const [yearRaw, monthRaw, dayRaw] = raw.split('-');
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+  const date = new Date(year, month - 1, day);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function getDateRange(period: Period, customStartDate: string, customEndDate: string) {
+  const today = new Date();
+  const fallbackStart = startOfMonth(today);
+  const fallbackEnd = endOfDay(today);
+
+  switch (period) {
+    case 'week':
+      return { start: startOfWeek(today), end: fallbackEnd };
+    case '30days':
+      return { start: startOfDay(addDays(today, -30)), end: fallbackEnd };
+    case 'year':
+      return { start: startOfYear(today), end: fallbackEnd };
+    case 'custom': {
+      const parsedStart = parseInputDate(customStartDate);
+      const parsedEnd = parseInputDate(customEndDate);
+      let start = parsedStart ? startOfDay(parsedStart) : fallbackStart;
+      let end = parsedEnd ? endOfDay(parsedEnd) : fallbackEnd;
+      if (start > end) {
+        const swappedStart = startOfDay(end);
+        const swappedEnd = endOfDay(start);
+        start = swappedStart;
+        end = swappedEnd;
+      }
+      return { start, end };
+    }
+    case 'month':
+    default:
+      return { start: fallbackStart, end: fallbackEnd };
+  }
+}
+
+function periodLabel(period: Period) {
+  switch (period) {
+    case 'week':
+      return 'This Week';
+    case '30days':
+      return 'Last 30 Days';
+    case 'year':
+      return 'This Year';
+    case 'custom':
+      return 'Custom';
+    case 'month':
+    default:
+      return 'This Month';
+  }
+}
+
+function getSelectedPeriodDays(period: Period, start: Date, end: Date) {
+  const safeMs = Math.max(endOfDay(end).getTime() - startOfDay(start).getTime(), 0);
+  const customDays = Math.max(1, Math.floor(safeMs / (24 * 60 * 60 * 1000)) + 1);
+  const today = new Date();
+
+  switch (period) {
+    case 'week':
+      return 7;
+    case '30days':
+      return 30;
+    case 'year': {
+      const yearStart = new Date(today.getFullYear(), 0, 1);
+      const elapsedMs = Math.max(startOfDay(today).getTime() - startOfDay(yearStart).getTime(), 0);
+      return Math.max(1, Math.floor(elapsedMs / (24 * 60 * 60 * 1000)) + 1);
+    }
+    case 'custom':
+      return customDays;
+    case 'month':
+    default:
+      return Math.max(1, today.getDate());
+  }
+}
+
 function colorToGradient(color?: string | null) {
   switch ((color || 'OTHER').toUpperCase()) {
     case 'RED':
@@ -94,6 +232,9 @@ export function Statistics() {
   const [cards, setCards] = useState<ApiCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [period, setPeriod] = useState<Period>('month');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -138,18 +279,33 @@ export function Statistics() {
     };
   }, [API_BASE]);
 
+  const selectedRange = useMemo(
+    () => getDateRange(period, customStartDate, customEndDate),
+    [period, customStartDate, customEndDate]
+  );
+
+  const filteredTx = useMemo(() => {
+    return transactions.filter((tx) => {
+      const rawDate = tx.occurred_at ?? tx.date ?? tx.created_at;
+      if (!rawDate) return false;
+      const d = new Date(rawDate);
+      if (!Number.isFinite(d.getTime())) return false;
+      return d >= selectedRange.start && d <= selectedRange.end;
+    });
+  }, [transactions, selectedRange]);
+
   const incomeTotal = useMemo(() => {
-    return transactions.filter((t) => isIncome(t.type)).reduce((sum, t) => sum + toNumber(t.amount), 0);
-  }, [transactions]);
+    return filteredTx.filter((t) => isIncome(t.type)).reduce((sum, t) => sum + toNumber(t.amount), 0);
+  }, [filteredTx]);
 
   const expensesTotal = useMemo(() => {
-    return transactions.filter((t) => isExpense(t.type)).reduce((sum, t) => sum + toNumber(t.amount), 0);
-  }, [transactions]);
+    return filteredTx.filter((t) => isExpense(t.type)).reduce((sum, t) => sum + toNumber(t.amount), 0);
+  }, [filteredTx]);
 
   const spendingByCategory: SpendingByCategoryItem[] = useMemo(() => {
     const map = new Map<string, { value: number; transactions: number }>();
 
-    for (const t of transactions) {
+    for (const t of filteredTx) {
       if (!isExpense(t.type)) continue;
       const category = getCategoryName(t);
       const current = map.get(category) || { value: 0, transactions: 0 };
@@ -162,29 +318,79 @@ export function Statistics() {
       .map(([name, v]) => ({ name, value: v.value, transactions: v.transactions }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 6);
-  }, [transactions]);
+  }, [filteredTx]);
 
-  const spendingByCard = useMemo(() => {
+  const creditCardUsage = useMemo(() => {
     const creditCards = cards.filter((c) => toNumber(c.credit_limit) > 0);
-    const creditIds = new Set(creditCards.map((c) => toId(c.id)));
-    const spentById = new Map<string, number>();
-
-    for (const t of transactions) {
-      if (!isExpense(t.type)) continue;
-      const cardId = toId(t.card_id);
-      if (!cardId || !creditIds.has(cardId)) continue;
-      spentById.set(cardId, (spentById.get(cardId) || 0) + toNumber(t.amount));
-    }
+    const today = new Date();
 
     return creditCards
-      .map((card) => ({
-        id: toId(card.id),
-        name: card.name,
-        value: spentById.get(toId(card.id)) || 0,
-        creditLimit: toNumber(card.credit_limit),
-        colorClass: colorToGradient(card.color),
-      }))
-      .sort((a, b) => b.value - a.value);
+      .map((card) => {
+        const cardId = toId(card.id);
+        const creditLimit = toNumber(card.credit_limit);
+        const closingDay = Math.max(1, Math.trunc(toNumber(card.closing_day) || 1));
+        const closeThisMonth = safeDayInMonth(today.getFullYear(), today.getMonth(), closingDay);
+        const nextClosing =
+          today <= endOfDay(closeThisMonth)
+            ? closeThisMonth
+            : safeDayInMonth(today.getFullYear(), today.getMonth() + 1, closingDay);
+        const cycleEnd = endOfDay(nextClosing);
+        const cycleStart = startOfDay(addDays(addMonths(nextClosing, -1), 1));
+
+        const amountDue = transactions.reduce((sum, tx) => {
+          if (!isExpense(tx.type)) return sum;
+
+          const txCardId = toId(tx.card_id ?? tx.cardId);
+          if (!txCardId || txCardId !== cardId) return sum;
+
+          const metadata = tx.metadata && typeof tx.metadata === 'object' ? tx.metadata : null;
+          const installments = metadata && typeof metadata.installments === 'object' ? metadata.installments : null;
+
+          if (installments) {
+            const months = Math.max(0, Math.trunc(toNumber(installments.months)));
+            if (months <= 0) return sum;
+
+            const monthlyAmountRaw = toNumber(installments.monthlyAmount);
+            const monthlyAmount = monthlyAmountRaw > 0 ? monthlyAmountRaw : toNumber(tx.amount) / months;
+            if (!(monthlyAmount > 0)) return sum;
+
+            const startRaw = installments.startAt ?? tx.occurred_at ?? tx.date ?? tx.created_at;
+            if (!startRaw) return sum;
+
+            const startAt = new Date(startRaw);
+            if (!Number.isFinite(startAt.getTime())) return sum;
+
+            const monthsElapsed = diffMonths(startAt, cycleEnd);
+            if (monthsElapsed >= 0 && monthsElapsed < months) {
+              return sum + monthlyAmount;
+            }
+
+            return sum;
+          }
+
+          const rawDate = tx.occurred_at ?? tx.date ?? tx.created_at;
+          if (!rawDate) return sum;
+
+          const txDate = new Date(rawDate);
+          if (!Number.isFinite(txDate.getTime())) return sum;
+
+          return txDate >= cycleStart && txDate <= cycleEnd ? sum + toNumber(tx.amount) : sum;
+        }, 0);
+
+        const usagePercent = creditLimit > 0 ? (amountDue / creditLimit) * 100 : 0;
+        const clampedPercent = Math.min(Math.max(usagePercent, 0), 100);
+
+        return {
+          id: cardId,
+          name: card.name,
+          amountDue,
+          creditLimit,
+          usagePercent,
+          clampedPercent,
+          colorClass: colorToGradient(card.color),
+        };
+      })
+      .sort((a, b) => b.amountDue - a.amountDue);
   }, [cards, transactions]);
 
   const incomeExpenseData = useMemo(
@@ -195,8 +401,12 @@ export function Statistics() {
     [incomeTotal, expensesTotal]
   );
 
-  const savings = incomeTotal - expensesTotal;
-  const savingsRate = incomeTotal > 0 ? (savings / incomeTotal) * 100 : 0;
+  const netBalance = incomeTotal - expensesTotal;
+  const selectedPeriodDays = useMemo(
+    () => getSelectedPeriodDays(period, selectedRange.start, selectedRange.end),
+    [period, selectedRange]
+  );
+  const avgDailySpend = expensesTotal / Math.max(1, selectedPeriodDays);
   const COLORS = ['#2DD4BF', '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981'];
   const spendingByCategoryChartData = useMemo(
     () =>
@@ -235,7 +445,56 @@ export function Statistics() {
     <div className="stats-page">
       <div className="stats-header">
         <h1 className="stats-title">Statistics</h1>
-        <p className="stats-subtitle">Your spending insights for February</p>
+        <p className="stats-subtitle">Your spending insights for {periodLabel(period).toLowerCase()}</p>
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+        <p className="text-sm font-medium text-[#64748B] mb-3">Period</p>
+        <div className="flex flex-wrap gap-2 rounded-2xl border border-gray-200 bg-slate-50 p-2">
+          {[
+            { value: 'month', label: 'This Month' },
+            { value: 'week', label: 'This Week' },
+            { value: '30days', label: 'Last 30 Days' },
+            { value: 'year', label: 'This Year' },
+            { value: 'custom', label: 'Custom' },
+          ].map((option) => {
+            const isActive = period === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setPeriod(option.value as Period)}
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                  isActive ? 'bg-[#2DD4BF] text-white' : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+        {period === 'custom' && (
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <label className="block">
+              <span className="block text-xs font-medium text-[#64748B] mb-1">Start Date</span>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#1F2933] outline-none transition-colors focus:border-[#2DD4BF]"
+              />
+            </label>
+            <label className="block">
+              <span className="block text-xs font-medium text-[#64748B] mb-1">End Date</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#1F2933] outline-none transition-colors focus:border-[#2DD4BF]"
+              />
+            </label>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -255,17 +514,23 @@ export function Statistics() {
         </div>
         <div className="stats-metric-card">
           <p className="stats-metric-label">Transactions</p>
-          <p className="stats-metric-value">{transactions.length}</p>
+          <p className="stats-metric-value">{filteredTx.length}</p>
         </div>
         <div className="stats-metric-card">
-          <p className="stats-metric-label">Savings</p>
-          <p className="stats-metric-value stats-metric-savings">${formatMoney(savings)}</p>
+          <p className="stats-metric-label">Net Balance</p>
+          <p
+            className={`stats-metric-value ${
+              netBalance < 0 ? 'stats-metric-expense' : 'stats-metric-income'
+            }`}
+          >
+            ${formatMoney(netBalance)}
+          </p>
         </div>
       </div>
 
       <div className="stats-grid-two">
         <div className="stats-card">
-          <h3 className="stats-card-title">Income vs Expenses</h3>
+          <h3 className="stats-card-title">Income vs Expenses ({periodLabel(period)})</h3>
           <div className="stats-chart-center">
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
@@ -283,7 +548,7 @@ export function Statistics() {
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number) => `$${value.toFixed(2)}`}
+                  formatter={(value: number | string) => `$${formatMoney(toNumber(value))}`}
                   contentStyle={{
                     backgroundColor: '#fff',
                     border: '1px solid #E2E8F0',
@@ -300,13 +565,13 @@ export function Statistics() {
             </ResponsiveContainer>
           </div>
           <div className="stats-footer-row">
-            <span className="stats-metric-label">Savings Rate</span>
-            <span className="stats-footer-value">{savingsRate.toFixed(1)}%</span>
+            <span className="stats-metric-label">Avg Daily Spend</span>
+            <span className="stats-footer-value">${formatMoney(avgDailySpend)}</span>
           </div>
         </div>
 
         <div className="stats-card">
-          <h3 className="stats-card-title">Spending by Category</h3>
+          <h3 className="stats-card-title">Spending by Category ({periodLabel(period)})</h3>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={spendingByCategoryChartData} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
               <XAxis
@@ -349,13 +614,11 @@ export function Statistics() {
         </div>
       </div>
 
-      {spendingByCard.length > 0 && (
+      {creditCardUsage.length > 0 && (
         <div className="stats-card stats-card-gap">
-          <h3 className="stats-card-title">Spending by Credit Card</h3>
+          <h3 className="stats-card-title">Credit Card Usage (Current Cycle)</h3>
           <div className="stats-card-list">
-            {spendingByCard.map((item) => {
-              const percentage = item.creditLimit > 0 ? (item.value / item.creditLimit) * 100 : 0;
-
+            {creditCardUsage.map((item) => {
               return (
                 <div key={item.id}>
                   <div className="stats-card-row-head">
@@ -366,12 +629,13 @@ export function Statistics() {
                       <span className="stats-card-name">{item.name}</span>
                     </div>
                     <div className="stats-card-row-right">
-                      <p className="stats-card-amount">${formatMoney(item.value)}</p>
-                      <p className="stats-card-percent">{percentage.toFixed(1)}% used</p>
+                      <p className="stats-metric-label">Amount due</p>
+                      <p className="stats-card-amount">${formatMoney(item.amountDue)}</p>
+                      <p className="stats-card-percent">{item.usagePercent.toFixed(1)}% used</p>
                     </div>
                   </div>
                   <div className="stats-progress-track">
-                    <div className="stats-progress-fill" style={{ width: `${Math.min(100, percentage)}%` }} />
+                    <div className="stats-progress-fill" style={{ width: `${item.clampedPercent}%` }} />
                   </div>
                 </div>
               );
@@ -381,7 +645,7 @@ export function Statistics() {
       )}
 
       <div className="stats-card stats-card-gap">
-        <h3 className="stats-card-title">Category Breakdown</h3>
+        <h3 className="stats-card-title">Category Breakdown ({periodLabel(period)})</h3>
         <div className="stats-table-wrap">
           <table className="stats-table">
             <thead>

@@ -1,9 +1,7 @@
-﻿import { Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ArrowRight, AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { formatMoney } from "../utils/formatMoney";
-import { applyCardOrder } from "../utils/cardOrder";
-import { LoadingScreen } from "./LoadingScreen";
 import "../../styles/components/CreditCards.css";
 
 type ApiCard = {
@@ -14,7 +12,7 @@ type ApiCard = {
   credit_limit: number | string | null;
   closing_day?: number | null;
   due_day?: number | null;
-  color?: string | null; // enum en backend, lo tratamos como string aqui
+  color?: string | null; // enum en backend, lo tratamos como string aquí
 };
 
 type UiCard = {
@@ -152,8 +150,7 @@ export function CreditCards() {
 
   // UI cards: solo credit (credit_limit > 0)
   const uiCards: UiCard[] = useMemo(() => {
-    return applyCardOrder(
-      cards
+    return cards
       .map((c) => {
         const creditLimit = toNumber(c.credit_limit);
         const id = toId(c.id);
@@ -166,8 +163,7 @@ export function CreditCards() {
           colorClass: colorToGradient(c.color),
         };
       })
-      .filter((c) => c.creditLimit > 0)
-    );
+      .filter((c) => c.creditLimit > 0);
   }, [cards, usedByCard]);
 
   const totals = useMemo(() => {
@@ -175,19 +171,6 @@ export function CreditCards() {
     const totalLimit = uiCards.reduce((sum, c) => sum + c.creditLimit, 0);
     return { totalUsed, totalLimit };
   }, [uiCards]);
-  const usagePercent = totals.totalLimit > 0 ? (totals.totalUsed / totals.totalLimit) * 100 : 0;
-  const clampedUsagePercent = Math.min(Math.max(usagePercent, 0), 100);
-  const isHighGlobalUsage = usagePercent > 80;
-  const totalAvailable = Math.max(totals.totalLimit - totals.totalUsed, 0);
-
-  if (loading) {
-    return (
-      <LoadingScreen
-        title="Credit Cards"
-        message="Loading your cards..."
-      />
-    );
-  }
 
   return (
     <div className="cc-page">
@@ -220,32 +203,12 @@ export function CreditCards() {
         </div>
       </div>
 
-      <div className="cc-summary-card cc-global-usage-card">
-        <div className="cc-usage-header">
-          <span className="cc-card-label">Total Usage</span>
-          <div className="cc-usage-right">
-            <span className={`cc-usage-percent ${isHighGlobalUsage ? "cc-usage-high" : "cc-usage-normal"}`}>
-              {usagePercent.toFixed(0)}%
-            </span>
-          </div>
-        </div>
-        <div className="cc-usage-track cc-usage-track-interactive">
-          <div
-            className={`cc-usage-fill ${isHighGlobalUsage ? "cc-usage-fill-high" : "cc-usage-fill-normal"}`}
-            style={{ width: `${clampedUsagePercent}%` }}
-          >
-            <span className="cc-usage-shimmer" />
-          </div>
-          <span className="cc-usage-marker" style={{ left: `calc(${clampedUsagePercent}% - 0.5rem)` }} />
-        </div>
-        <div className="cc-global-usage-footer">
-          <span className="cc-card-label">Used: ${formatMoney(totals.totalUsed)}</span>
-          <span className="cc-card-label">Available: ${formatMoney(totalAvailable)}</span>
-        </div>
-      </div>
-
       {/* List */}
-      {uiCards.length === 0 ? (
+      {loading ? (
+        <div className="cc-content-box">
+          <p className="cc-muted-text">Loading cards…</p>
+        </div>
+      ) : uiCards.length === 0 ? (
         <div className="cc-content-box">
           <p className="cc-muted-text">No credit cards found.</p>
           <p className="cc-tip-text">Tip: add a card with a credit limit in Manage Cards.</p>
@@ -275,7 +238,7 @@ export function CreditCards() {
                         <h3 className="cc-card-name">{card.name}</h3>
                       </div>
                       <div>
-                        <p className="cc-card-last4">{"\u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022"} {card.last4}</p>
+                        <p className="cc-card-last4">•••• •••• •••• {card.last4}</p>
                       </div>
                     </div>
                   </div>
@@ -341,4 +304,3 @@ export function CreditCards() {
     </div>
   );
 }
-

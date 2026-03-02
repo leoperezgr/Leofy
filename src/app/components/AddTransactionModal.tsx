@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
-import { categories } from '../utils/mockData';
+import { categories as mockCategories } from '../utils/mockData';
 import * as LucideIcons from 'lucide-react';
 import { formatMoney } from '../utils/formatMoney';
 import '../../styles/components/AddTransactionModal.css';
@@ -18,6 +18,74 @@ type Card = {
   limit?: number;
 };
 
+type UiCategory = {
+  id: string;
+  name: string;
+  icon: string;
+  type: 'EXPENSE' | 'INCOME';
+  source: 'api' | 'managed' | 'default' | 'mock';
+};
+
+type ApiCategory = {
+  id?: string | number;
+  name?: string | null;
+  type?: string | null;
+};
+
+const DEFAULT_EXPENSE_CATEGORIES: UiCategory[] = [
+  { id: 'default_groceries', name: 'Groceries', icon: 'ShoppingCart', type: 'EXPENSE', source: 'default' },
+  { id: 'default_dining', name: 'Dining', icon: 'Utensils', type: 'EXPENSE', source: 'default' },
+  { id: 'default_coffee', name: 'Coffee', icon: 'Coffee', type: 'EXPENSE', source: 'default' },
+  { id: 'default_transportation', name: 'Transportation', icon: 'Car', type: 'EXPENSE', source: 'default' },
+  { id: 'default_shopping', name: 'Shopping', icon: 'ShoppingBag', type: 'EXPENSE', source: 'default' },
+  { id: 'default_bills', name: 'Bills & Subscriptions', icon: 'Receipt', type: 'EXPENSE', source: 'default' },
+  { id: 'default_health', name: 'Health & Personal', icon: 'Heart', type: 'EXPENSE', source: 'default' },
+];
+
+const CATEGORY_STORAGE_KEY = 'leofy_settings_categories_v1';
+
+const DEFAULT_INCOME_CATEGORIES: UiCategory[] = mockCategories
+  .filter((cat) => cat.type === 'income')
+  .map((cat) => ({
+    id: `mock_${cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+    name: cat.name,
+    icon: cat.icon,
+    type: 'INCOME' as const,
+    source: 'mock' as const,
+  }));
+
+function normalizeCategoryType(value: unknown): UiCategory['type'] {
+  return String(value || '').toUpperCase() === 'INCOME' ? 'INCOME' : 'EXPENSE';
+}
+
+function getCategoryIconName(name: string) {
+  const normalized = String(name || '').trim().toLowerCase();
+
+  if (normalized.includes('grocery')) return 'ShoppingCart';
+  if (normalized.includes('dining') || normalized.includes('food') || normalized.includes('restaurant')) return 'Utensils';
+  if (normalized.includes('coffee')) return 'Coffee';
+  if (normalized.includes('transport') || normalized.includes('gas') || normalized.includes('car')) return 'Car';
+  if (normalized.includes('shop')) return 'ShoppingBag';
+  if (normalized.includes('bill') || normalized.includes('subscription')) return 'Receipt';
+  if (normalized.includes('health') || normalized.includes('personal')) return 'Heart';
+
+  const fromMock = mockCategories.find((cat) => cat.name.trim().toLowerCase() === normalized);
+  return fromMock?.icon || 'Tag';
+}
+
+function normalizeApiCategory(item: ApiCategory): UiCategory | null {
+  const name = String(item?.name || '').trim();
+  if (!name) return null;
+
+  return {
+    id: String(item?.id ?? name),
+    name,
+    icon: getCategoryIconName(name),
+    type: normalizeCategoryType(item?.type),
+    source: 'api',
+  };
+}
+
 export function AddTransactionModal({ open, onClose }: AddTransactionModalProps) {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
   const INSTALLMENT_OPTIONS = [3, 6, 9, 12, 18] as const;
@@ -34,6 +102,8 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
   const [customCategory, setCustomCategory] = useState('');
 
   const [cards, setCards] = useState<Card[]>([]);
+  const [apiCategories, setApiCategories] = useState<UiCategory[]>([]);
+  const [managedCategories, setManagedCategories] = useState<UiCategory[]>([]);
   const [cardsLoading, setCardsLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
 
@@ -45,9 +115,26 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
   const creditCardsOnly = cards.filter(isCreditCard);
   const debitCardsOnly = cards.filter((c) => !isCreditCard(c));
 
-  const filteredCategories = categories.filter((cat) =>
-    cat.type === (type === 'transfer' ? 'expense' : type)
-  );
+  const filteredCategories = useMemo(() => {
+    if (type === 'transfer') return [];
+
+    const desiredType = type === 'income' ? 'INCOME' : 'EXPENSE';
+    const managedMatches = managedCategories.filter((cat) => cat.type === desiredType);
+    const apiMatches = apiCategories.filter((cat) => cat.type === desiredType);
+
+    if (managedMatches.length > 0) return managedMatches;
+    if (apiMatches.length > 0) return apiMatches;
+    if (desiredType === 'EXPENSE') return DEFAULT_EXPENSE_CATEGORIES;
+    return DEFAULT_INCOME_CATEGORIES;
+  }, [managedCategories, apiCategories, type]);
+
+  const selectedCategory = useMemo(() => {
+    return (
+      filteredCategories.find((cat) => cat.id === category) ||
+      filteredCategories.find((cat) => cat.name === category) ||
+      null
+    );
+  }, [filteredCategories, category]);
 
   // --- Amount formatter (commas + up to 2 decimals) ---
   const formatAmount = (value: string) => {
@@ -108,6 +195,67 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
   }, [open, API_BASE]);
 
   useEffect(() => {
+    if (!open) return;
+
+    try {
+      const raw = localStorage.getItem(CATEGORY_STORAGE_KEY);
+      if (!raw) {
+        setManagedCategories([]);
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        setManagedCategories([]);
+        return;
+      }
+
+      const normalized = parsed
+        .map((item: any) => {
+          const name = String(item?.name || '').trim();
+          if (!name) return null;
+          return {
+            id: String(item?.id || `managed_${name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`),
+            name,
+            icon: String(item?.icon || getCategoryIconName(name)),
+            type: String(item?.type || '').toLowerCase() === 'income' ? 'INCOME' : 'EXPENSE',
+            source: 'managed' as const,
+          };
+        })
+        .filter((item): item is UiCategory => Boolean(item));
+
+      setManagedCategories(normalized);
+    } catch {
+      setManagedCategories([]);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/categories`, {
+          headers: authHeaders(),
+        });
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) throw new Error(data?.error || 'Failed to load categories');
+
+        const normalized = Array.isArray(data)
+          ? data
+              .map((item) => normalizeApiCategory(item as ApiCategory))
+              .filter((item): item is UiCategory => Boolean(item))
+          : [];
+
+        setApiCategories(normalized);
+      } catch {
+        setApiCategories([]);
+      }
+    })();
+  }, [open, API_BASE]);
+
+  useEffect(() => {
   if (type === "transfer") {
     setPaymentMethod("debit"); // o "cash", da igual porque no se muestra
     setPurchaseType('one_time');
@@ -134,6 +282,15 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
       setPurchaseType('one_time');
     }
   }, [type, paymentMethod]);
+
+  useEffect(() => {
+    if (type === 'transfer') return;
+    if (!category) return;
+    if (!selectedCategory) {
+      setCategory('');
+      setCustomCategory('');
+    }
+  }, [type, category, selectedCategory]);
 
   const amountNumPreview = Number(amount);
   const validAmountPreview = Number.isFinite(amountNumPreview) && amountNumPreview > 0 ? amountNumPreview : 0;
@@ -214,7 +371,14 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
       }
 
       // ✅ NORMAL TRANSACTION (income/expense)
-      const finalCategory = category === 'Other' ? customCategory.trim() : category;
+      const isOtherCategory = selectedCategory?.name === 'Other';
+      const shouldPersistCategoryMeta =
+        selectedCategory?.source === 'default' ||
+        selectedCategory?.source === 'managed' ||
+        selectedCategory?.source === 'mock';
+      const finalCategory = isOtherCategory
+        ? customCategory.trim()
+        : (selectedCategory?.name || category).trim();
       if (!finalCategory) {
         alert('Please enter a category');
         return;
@@ -224,25 +388,38 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
         return;
       }
 
+      const metadata = {
+        paymentMethod,
+        ...(shouldPersistCategoryMeta && selectedCategory
+          ? {
+              category: {
+                name: selectedCategory.name,
+                icon: selectedCategory.icon,
+                source: selectedCategory.source,
+              },
+            }
+          : {}),
+        ...(purchaseType === 'installments'
+          ? {
+              installments: {
+                months: installmentMonths,
+                monthlyAmount: round2(amountNum / installmentMonths),
+              },
+            }
+          : {}),
+      };
+
       const payload = {
         type, // "income" | "expense"
         amount: amountNum,
         category: finalCategory,
         description: desc || finalCategory,
         date: new Date().toISOString(),
+        category_id:
+          selectedCategory && selectedCategory.source === 'api' && !isOtherCategory ? selectedCategory.id : null,
         card_id: paymentMethod === 'cash' ? null : cardId || null,
         paymentMethod,
-        metadata: {
-          paymentMethod,
-          ...(purchaseType === 'installments'
-            ? {
-                installments: {
-                  months: installmentMonths,
-                  monthlyAmount: round2(amountNum / installmentMonths),
-                },
-              }
-            : {}),
-        },
+        metadata,
       };
 
       const res = await fetch(`${API_BASE}/api/transactions`, {
@@ -278,7 +455,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
 
   const getIconComponent = (iconName: string) => {
     const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Circle;
+    return Icon || LucideIcons.Tag;
   };
 
   return (
@@ -429,11 +606,11 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
                   const IconComponent = getIconComponent(cat.icon);
                   return (
                     <button
-                      key={cat.name}
+                      key={cat.id}
                       type="button"
-                      onClick={() => setCategory(cat.name)}
+                      onClick={() => setCategory(cat.id)}
                       className={`atm-category-button ${
-                        category === cat.name
+                        selectedCategory?.id === cat.id
                           ? 'atm-category-button-active'
                           : 'atm-category-button-inactive'
                       }`}
@@ -447,7 +624,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
             </div>
           )}
 
-          {type !== 'transfer' && category === 'Other' && (
+          {type !== 'transfer' && selectedCategory?.name === 'Other' && (
             <div>
               <label className="atm-label">Custom Category</label>
               <input

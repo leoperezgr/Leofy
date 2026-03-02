@@ -2,3 +2,22 @@
   margin: 0 auto;
   max-width: 80rem;
 }
+
+.mc-row-reorder {
+  cursor: grab;
+  user-select: none;
+}
+
+.mc-row-reorder:active {
+  cursor: grabbing;
+}
+
+.mc-row-dragging {
+  opacity: 0.55;
+}
+
+.mc-row-drop-target {
+  background: #ecfdf5;
+  outline: 2px dashed #2dd4bf;
+  outline-offset: -2px;
+}

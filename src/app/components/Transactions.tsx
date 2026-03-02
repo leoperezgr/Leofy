@@ -280,7 +280,14 @@ export function Transactions() {
           (t.category || "").toLowerCase().includes(q)
         );
       })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort((a, b) => {
+        const byDay = String(b.date || "").localeCompare(String(a.date || ""));
+        if (byDay !== 0) return byDay;
+        const bId = Number(b.id);
+        const aId = Number(a.id);
+        if (Number.isFinite(bId) && Number.isFinite(aId)) return bId - aId;
+        return String(b.id).localeCompare(String(a.id));
+      });
   }, [items, filter, searchQuery]);
 
   const groupedTransactions = useMemo(() => {

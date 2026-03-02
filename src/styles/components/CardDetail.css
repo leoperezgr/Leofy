@@ -180,6 +180,17 @@
   gap: 1.5rem;
 }
 
+.cd-cycle-stats-grid {
+  gap: 0.9rem;
+}
+
+.cd-cycle-stat {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+  padding: 0.9rem;
+}
+
 .cd-label,
 .cd-usage-label {
   margin-bottom: 0.5rem;
@@ -350,6 +361,31 @@
   font-size: 0.875rem;
 }
 
+.cd-installment-row {
+  margin-top: 0.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cd-installment-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  background: #ecfeff;
+  padding: 0.2rem 0.55rem;
+  color: #0f766e;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.cd-installment-info {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
 .cd-transaction-right {
   text-align: right;
 }
@@ -416,5 +452,10 @@
 
   .cd-stats-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .cd-cycle-stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
   }
 }
