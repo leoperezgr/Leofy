@@ -361,6 +361,31 @@
   font-size: 0.875rem;
 }
 
+.cd-installment-row {
+  margin-top: 0.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cd-installment-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  background: #ecfeff;
+  padding: 0.2rem 0.55rem;
+  color: #0f766e;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.cd-installment-info {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
 .cd-transaction-right {
   text-align: right;
 }

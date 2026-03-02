@@ -24,6 +24,13 @@ type ApiCategory = {
   icon?: string | null;
 };
 
+type InstallmentsInfo = {
+  months: number;
+  monthlyAmount: number;
+  currentMonth: number;
+  remainingMonths: number;
+};
+
 type ApiTx = {
   id: string | number;
   type: "INCOME" | "EXPENSE" | "income" | "expense";
@@ -123,6 +130,39 @@ function computeAmountDueForRange(transactions: ApiTx[], currentCardId: string, 
   }, 0);
 
   return Math.max(0, due);
+}
+
+function getInstallmentsInfo(row: ApiTx): InstallmentsInfo | null {
+  const installments = row?.metadata?.installments;
+  if (!installments || typeof installments !== "object") return null;
+
+  const months = Math.trunc(toNumber((installments as any).months));
+  if (months < 2 || months > 60) return null;
+
+  const amount = toNumber(row?.amount);
+  const monthlyAmountRaw =
+    (installments as any).monthlyAmount !== undefined
+      ? toNumber((installments as any).monthlyAmount)
+      : Number((amount / months).toFixed(2));
+  if (monthlyAmountRaw <= 0) return null;
+
+  const startRaw = (installments as any).startAt || row?.occurred_at;
+  const startAt = startRaw ? new Date(startRaw) : null;
+  const now = new Date();
+
+  let currentMonth = 1;
+  if (startAt && !Number.isNaN(startAt.getTime())) {
+    const monthsElapsed =
+      (now.getFullYear() - startAt.getFullYear()) * 12 + (now.getMonth() - startAt.getMonth());
+    currentMonth = Math.max(1, Math.min(months, monthsElapsed + 1));
+  }
+
+  return {
+    months,
+    monthlyAmount: Number(monthlyAmountRaw.toFixed(2)),
+    currentMonth,
+    remainingMonths: Math.max(0, months - currentMonth),
+  };
 }
 
 function colorToGradient(color?: string | null) {
@@ -279,6 +319,7 @@ export function CreditCardDetail() {
           description: t.description ?? "—",
           category: categoryResolved,
           date: t.occurred_at,
+          installments: getInstallmentsInfo(t),
         };
       });
   }, [tx, cardId, categoryById]);
@@ -578,11 +619,25 @@ export function CreditCardDetail() {
                       <div className="cd-transaction-icon-wrap">
                         <IconComponent className="cd-transaction-icon" />
                       </div>
-                      <div className="cd-transaction-main">
-                        <p className="cd-transaction-description">{transaction.description}</p>
-                        <p className="cd-transaction-category">{transaction.category}</p>
-                      </div>
-                    </div>
+                       <div className="cd-transaction-main">
+                         <p className="cd-transaction-description">{transaction.description}</p>
+                         <p className="cd-transaction-category">{transaction.category}</p>
+                         {transaction.installments && (
+                           <div className="cd-installment-row">
+                             <span className="cd-installment-chip">Installments</span>
+                             <span className="cd-installment-info">
+                               {transaction.installments.currentMonth}/{transaction.installments.months}
+                               {" \u2022 "}
+                               ${formatMoney(transaction.installments.monthlyAmount)}/mo
+                               {" \u2022 "}
+                               {transaction.installments.remainingMonths > 0
+                                 ? `${transaction.installments.remainingMonths} left`
+                                 : "Completed"}
+                             </span>
+                           </div>
+                         )}
+                       </div>
+                     </div>
                     <div className="cd-transaction-right">
                       <p className="cd-transaction-amount">
                         -${formatMoney(transaction.amount)}
