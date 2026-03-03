@@ -7,8 +7,44 @@
 .stats-header,
 .stats-metrics-grid,
 .stats-grid-two,
-.stats-card-gap {
+.stats-card-gap,
+.stats-section {
   margin-bottom: 1.5rem;
+}
+
+.stats-section {
+  border: 1px solid #e2e8f0;
+  border-radius: 1.5rem;
+  padding: 1rem;
+}
+
+.stats-section-period {
+  background:
+    linear-gradient(180deg, rgb(248 250 252 / 0.95), rgb(255 255 255 / 1));
+}
+
+.stats-section-live {
+  background:
+    linear-gradient(180deg, rgb(255 247 237 / 0.92), rgb(255 255 255 / 1));
+  border-color: #fed7aa;
+}
+
+.stats-section-head {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stats-section-title {
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.stats-section-subtitle {
+  color: #64748b;
+  font-size: 0.875rem;
 }
 
 .stats-title {
@@ -240,6 +276,10 @@
 @media (min-width: 1024px) {
   .stats-page {
     padding: 2rem;
+  }
+
+  .stats-section {
+    padding: 1.5rem;
   }
 
   .stats-metrics-grid {

@@ -129,3 +129,52 @@ authRouter.put("/me", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Error interno" });
   }
 });
+
+authRouter.put("/me/password", requireAuth, async (req, res) => {
+  try {
+    if (!req.user?.id) return res.status(401).json({ error: "No autorizado" });
+
+    const userId = BigInt(req.user.id);
+    const { current_password, new_password } = req.body;
+
+    if (typeof current_password !== "string" || current_password.length === 0) {
+      return res.status(400).json({ error: "La contraseña actual es requerida" });
+    }
+
+    if (typeof new_password !== "string" || new_password.length < 8) {
+      return res.status(400).json({ error: "La nueva contraseña debe tener al menos 8 caracteres" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        password_hash: true,
+      },
+    });
+
+    if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+
+    const isValidCurrent = await bcrypt.compare(current_password, user.password_hash);
+    if (!isValidCurrent) {
+      return res.status(401).json({ error: "La contraseña actual es incorrecta" });
+    }
+
+    const samePassword = await bcrypt.compare(new_password, user.password_hash);
+    if (samePassword) {
+      return res.status(400).json({ error: "La nueva contraseña debe ser diferente a la actual" });
+    }
+
+    const password_hash = await bcrypt.hash(new_password, 10);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password_hash },
+    });
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("ME PASSWORD PUT ERROR:", err);
+    return res.status(500).json({ error: "Error interno" });
+  }
+});
