@@ -13,6 +13,7 @@ import { Settings } from "./components/Settings";
 import { SettingsCategories } from "./components/SettingsCategories";
 import { ManageCards } from "./components/ManageCards";
 import { TransactionDetail } from "./components/TransactionDetail";
+import { TesterPanel } from "./components/TesterPanel";
 
 // ✅ Flags reales
 const hasOnboarded = () => localStorage.getItem("leofy_onboarded") === "true";
@@ -61,6 +62,17 @@ export const router = createBrowserRouter([
       { path: "settings", Component: Settings },
       { path: "settings/profile", Component: Settings },
       { path: "settings/categories", Component: SettingsCategories },
+      {
+        path: "tester",
+        Component: TesterPanel,
+        loader: () => {
+          try {
+            const user = JSON.parse(localStorage.getItem("leofy_user") || "{}");
+            if (!["TESTER", "ADMIN"].includes(user.role)) return redirect("/");
+          } catch { return redirect("/"); }
+          return null;
+        },
+      },
     ],
   },
 ]);

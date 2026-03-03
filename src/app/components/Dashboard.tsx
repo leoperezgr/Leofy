@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, ResponsiveContainer, LabelList } from 'recharts';
 import { formatMoney } from '../utils/formatMoney';
 import { applyCardOrder } from '../utils/cardOrder';
 import { LoadingScreen } from './LoadingScreen';
+import { useAppDate } from '../contexts/AppDateContext';
 import '../../styles/components/Dashboard.css';
 
 type DashboardData = {
@@ -74,6 +75,8 @@ type CurrentCycleInfo = {
   source: CycleRangeSource;
   cutoffDate: Date | null;
   dueDate: Date | null;
+  nextCutoffDate: Date | null;
+  isWithinPaymentWindow: boolean;
 };
 type CreditDueCardItem = {
   cardId: string;
@@ -87,13 +90,16 @@ type CreditDueCardItem = {
   source: CycleRangeSource;
   cutoffDate: Date | null;
   dueDate: Date | null;
+  nextCutoffDate: Date | null;
   cutoffDeltaLabel: string;
   dueDeltaLabel: string;
+  nextCutoffDeltaLabel: string;
   isPaid: boolean;
   isOverdue: boolean;
   daysOverdue: number;
   isDueSoon: boolean;
   daysUntilDue: number | null;
+  isWaitingForCutoff: boolean;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -185,12 +191,6 @@ function addDays(d: Date, n: number) {
   return next;
 }
 
-function addMonths(d: Date, n: number) {
-  const next = new Date(d);
-  next.setMonth(next.getMonth() + n);
-  return next;
-}
-
 function safeDayInMonth(year: number, monthIndex0: number, day: number) {
   const normalizedDay = Math.max(1, Math.trunc(day || 1));
   const lastDay = new Date(year, monthIndex0 + 1, 0).getDate();
@@ -223,8 +223,7 @@ function parseInputDate(value: string, fallback: Date) {
   return new Date(year, month - 1, day);
 }
 
-function getDateRange(period: Period, customStartDate: string, customEndDate: string) {
-  const today = new Date();
+function getDateRange(period: Period, customStartDate: string, customEndDate: string, today: Date = new Date()) {
 
   switch (period) {
     case 'week':
@@ -323,15 +322,6 @@ function safeParseDate(value: unknown): Date | null {
   return null;
 }
 
-function getNextMonthlyDate(dayOfMonth: number, ref: Date) {
-  const normalizedDay = Math.max(1, Math.trunc(dayOfMonth || 1));
-  const thisMonthCandidate = safeDayInMonth(ref.getFullYear(), ref.getMonth(), normalizedDay);
-  if (startOfDay(thisMonthCandidate).getTime() >= startOfDay(ref).getTime()) {
-    return thisMonthCandidate;
-  }
-
-  return safeDayInMonth(ref.getFullYear(), ref.getMonth() + 1, normalizedDay);
-}
 
 function getLast30DaysRange(ref: Date) {
   return {
@@ -341,10 +331,6 @@ function getLast30DaysRange(ref: Date) {
 }
 
 function getCurrentCycleInfo(card: ApiCard, refDate: Date): CurrentCycleInfo {
-  const explicitCutoffDate = safeParseDate(
-    (card as any).cutoffDate ??
-    (card as any).cutoff_date
-  );
   const explicitDueDate = safeParseDate(
     (card as any).dueDate ??
     (card as any).due_date
@@ -360,65 +346,37 @@ function getCurrentCycleInfo(card: ApiCard, refDate: Date): CurrentCycleInfo {
   const cutoffDay = Math.trunc(toNumber(cutoffDayRaw));
   const dueDay = Math.trunc(toNumber(dueDayRaw));
 
-  if (explicitCutoffDate) {
-    const cutoffDate = startOfDay(explicitCutoffDate);
-    const previousCutoff = Number.isFinite(cutoffDay) && cutoffDay > 0
-      ? safeDayInMonth(cutoffDate.getFullYear(), cutoffDate.getMonth() - 1, cutoffDay)
-      : addMonths(cutoffDate, -1);
-    const cycleStart = startOfDay(addDays(previousCutoff, 1));
-
-    let dueDate = explicitDueDate ? startOfDay(explicitDueDate) : null;
-    if (!dueDate && Number.isFinite(dueDay) && dueDay > 0) {
-      const dueMonthOffset = Number.isFinite(cutoffDay) && cutoffDay > 0 && dueDay >= cutoffDay ? 0 : 1;
-      dueDate = startOfDay(
-        safeDayInMonth(cutoffDate.getFullYear(), cutoffDate.getMonth() + dueMonthOffset, dueDay)
-      );
-    }
-    if (dueDate && dueDate.getTime() <= cutoffDate.getTime()) {
-      dueDate = startOfDay(
-        safeDayInMonth(dueDate.getFullYear(), dueDate.getMonth() + 1, dueDate.getDate())
-      );
-    }
-
-    return {
-      start: cycleStart,
-      end: endOfDay(cutoffDate),
-      label: formatRangeLabel(cycleStart, cutoffDate),
-      source: 'cutoff',
-      cutoffDate,
-      dueDate,
-    };
-  }
-
   if (!Number.isFinite(cutoffDay) || cutoffDay <= 0) {
     const fallback = getLast30DaysRange(refDate);
+    const dueDate = explicitDueDate ? startOfDay(explicitDueDate) : null;
     return {
       start: fallback.start,
       end: fallback.end,
       label: 'Last 30 Days',
       source: 'fallback',
       cutoffDate: null,
-      dueDate: explicitDueDate ? startOfDay(explicitDueDate) : null,
+      dueDate,
+      nextCutoffDate: null,
+      isWithinPaymentWindow: dueDate ? startOfDay(refDate).getTime() <= dueDate.getTime() : true,
     };
   }
 
-  const cutoffActual = getNextMonthlyDate(cutoffDay, refDate);
+  const today = startOfDay(refDate);
+  const cutoffThisMonth = startOfDay(safeDayInMonth(today.getFullYear(), today.getMonth(), cutoffDay));
+  const cutoffActual = today.getTime() >= cutoffThisMonth.getTime()
+    ? cutoffThisMonth
+    : startOfDay(safeDayInMonth(today.getFullYear(), today.getMonth() - 1, cutoffDay));
   const previousCutoff = safeDayInMonth(cutoffActual.getFullYear(), cutoffActual.getMonth() - 1, cutoffDay);
   const cycleStart = startOfDay(addDays(previousCutoff, 1));
+  const nextCutoffDate = startOfDay(safeDayInMonth(cutoffActual.getFullYear(), cutoffActual.getMonth() + 1, cutoffDay));
 
-  let dueDate = explicitDueDate ? startOfDay(explicitDueDate) : null;
-  if (!dueDate && Number.isFinite(dueDay) && dueDay > 0) {
-    const dueMonthOffset = dueDay >= cutoffDay ? 0 : 1;
-    dueDate = startOfDay(
-      safeDayInMonth(cutoffActual.getFullYear(), cutoffActual.getMonth() + dueMonthOffset, dueDay)
-    );
-  }
-  if (dueDate && dueDate.getTime() <= startOfDay(cutoffActual).getTime()) {
-    const dueDateDay = dueDate.getDate();
-    dueDate = startOfDay(
-      safeDayInMonth(cutoffActual.getFullYear(), cutoffActual.getMonth() + 1, dueDateDay)
-    );
-  }
+  const dueDate = Number.isFinite(dueDay) && dueDay > 0
+    ? startOfDay(
+        safeDayInMonth(cutoffActual.getFullYear(), cutoffActual.getMonth() + 1, dueDay)
+      )
+    : explicitDueDate
+      ? startOfDay(explicitDueDate)
+      : null;
 
   return {
     start: cycleStart,
@@ -427,6 +385,8 @@ function getCurrentCycleInfo(card: ApiCard, refDate: Date): CurrentCycleInfo {
     source: 'cutoff',
     cutoffDate: startOfDay(cutoffActual),
     dueDate,
+    nextCutoffDate,
+    isWithinPaymentWindow: dueDate ? today.getTime() <= dueDate.getTime() : true,
   };
 }
 
@@ -494,6 +454,7 @@ function getTransactionCardId(tx: ApiTx) {
 }
 
 export function Dashboard() {
+  const { getAppDate } = useAppDate();
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
   const userName = useMemo(() => {
     try {
@@ -594,8 +555,8 @@ export function Dashboard() {
 }, [API_BASE]);
 
   const selectedRange = useMemo(
-    () => getDateRange(period, customStartDate, customEndDate),
-    [period, customStartDate, customEndDate]
+    () => getDateRange(period, customStartDate, customEndDate, getAppDate()),
+    [period, customStartDate, customEndDate, getAppDate]
   );
 
   const filteredTx = useMemo(() => {
@@ -797,13 +758,12 @@ export function Dashboard() {
   }, [transactions, debitCardIds]);
 
   const creditDueByCard = useMemo<CreditDueCardItem[]>(() => {
-    const today = new Date();
+    const today = getAppDate();
 
     return creditCards
       .map((card) => {
         const cardId = toId(card.id);
         const cycle = getCurrentCycleInfo(card, today);
-
         const cycleRows = transactions.filter((tx) => {
           const txCardId = getTransactionCardId(tx);
           if (!txCardId || txCardId !== cardId) return false;
@@ -831,16 +791,28 @@ export function Dashboard() {
         const dueEstimated = sumAmounts(expenseRows);
         const paidInCycle = sumAmounts(paymentRows);
         const remainingDue = Math.max(dueEstimated - paidInCycle, 0);
-        const progressPercent = dueEstimated > 0 ? Math.min((paidInCycle / dueEstimated) * 100, 100) : 0;
+        const progressPercent = dueEstimated > 0
+          ? Math.min((paidInCycle / dueEstimated) * 100, 100)
+          : 0;
         const cutoffDate = cycle.cutoffDate;
         const dueDate = cycle.dueDate;
+        const nextCutoffDate = cycle.nextCutoffDate;
         const cutoffDelta = cutoffDate ? formatDayDelta(cutoffDate, today) : null;
         const dueDelta = dueDate ? formatDayDelta(dueDate, today) : null;
+        const nextCutoffDelta = nextCutoffDate ? formatDayDelta(nextCutoffDate, today) : null;
         const isPaid = remainingDue <= 0.01;
         const isOverdue = Boolean(dueDate && dueDelta?.isPast && !isPaid);
+        const isWaitingForCutoff = !cycle.isWithinPaymentWindow && isPaid;
         const daysOverdue = isOverdue ? dueDelta?.absDays ?? 0 : 0;
         const daysUntilDue = dueDate && !dueDelta?.isPast ? dueDelta?.signedDays ?? 0 : null;
-        const isDueSoon = Boolean(dueDate && !isOverdue && !isPaid && daysUntilDue !== null && daysUntilDue <= 3);
+        const isDueSoon = Boolean(
+          !isWaitingForCutoff &&
+          dueDate &&
+          !isOverdue &&
+          !isPaid &&
+          daysUntilDue !== null &&
+          daysUntilDue <= 3
+        );
 
         return {
           cardId,
@@ -854,16 +826,25 @@ export function Dashboard() {
           source: cycle.source,
           cutoffDate,
           dueDate,
+          nextCutoffDate,
           cutoffDeltaLabel: cutoffDelta ? cutoffDelta.label : 'Not set',
           dueDeltaLabel: dueDelta ? dueDelta.label : 'Not set',
+          nextCutoffDeltaLabel: nextCutoffDelta ? nextCutoffDelta.label : 'Not set',
           isPaid,
           isOverdue,
           daysOverdue,
           isDueSoon,
           daysUntilDue,
+          isWaitingForCutoff,
         };
       })
       .sort((a, b) => {
+        if (a.isWaitingForCutoff && b.isWaitingForCutoff) {
+          return (a.nextCutoffDate?.getTime() ?? Number.MAX_SAFE_INTEGER) - (b.nextCutoffDate?.getTime() ?? Number.MAX_SAFE_INTEGER);
+        }
+        if (a.isWaitingForCutoff) return 1;
+        if (b.isWaitingForCutoff) return -1;
+
         if (a.isOverdue && b.isOverdue) return b.daysOverdue - a.daysOverdue;
         if (a.isOverdue) return -1;
         if (b.isOverdue) return 1;
@@ -874,7 +855,7 @@ export function Dashboard() {
 
         return b.remainingDue - a.remainingDue;
       });
-  }, [creditCards, transactions]);
+  }, [creditCards, transactions, getAppDate]);
 
   const totalCreditDueThisCycle = useMemo(
     () => creditDueByCard.reduce((sum, item) => sum + item.remainingDue, 0),
@@ -1199,7 +1180,7 @@ export function Dashboard() {
             <div className="mb-5 flex items-center justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold text-[#1F2933]">Credit Due by Card</h3>
-                <p className="text-sm text-[#64748B]">Current cycle estimate per credit card.</p>
+                <p className="text-sm text-[#64748B]">Last closed cycle still within its payment window.</p>
               </div>
               <Link to="/cards" className="text-sm text-[#2DD4BF] hover:text-[#14B8A6]">
                 View all
@@ -1213,7 +1194,7 @@ export function Dashboard() {
             ) : (
               <div className="space-y-4">
                 {creditDueByCard.map((item) => {
-                  const isSettled = item.remainingDue <= 0;
+                  const isSettled = item.isWaitingForCutoff || item.remainingDue <= 0;
 
                   return (
                     <div
@@ -1224,10 +1205,16 @@ export function Dashboard() {
                           : 'border-gray-100 bg-white'
                       }`}
                     >
+                      {item.isWaitingForCutoff && (
+                        <div className="mb-4 flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-700">
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-100 text-xs font-bold">i</span>
+                          <span>Espera a que se corte la tarjeta</span>
+                        </div>
+                      )}
                       {item.isOverdue && (
                         <div className="mb-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
                           <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-xs font-bold">!</span>
-                          <span>Tu limite de pago fue hace {item.daysOverdue} dia{item.daysOverdue === 1 ? '' : 's'}</span>
+                          <span>No pagaste esta tarjeta. Llevas {item.daysOverdue} dia{item.daysOverdue === 1 ? '' : 's'} de atraso.</span>
                         </div>
                       )}
                       {!item.isOverdue && item.isDueSoon && item.daysUntilDue !== null && (
@@ -1247,26 +1234,41 @@ export function Dashboard() {
                               <p className="font-semibold text-[#1F2933]">{item.name}</p>
                               <span
                                 className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                  item.isPaid
+                                  item.isWaitingForCutoff
+                                    ? 'bg-sky-50 text-sky-700'
+                                    : item.isPaid
                                     ? 'bg-emerald-50 text-emerald-700'
                                     : item.isOverdue
                                       ? 'bg-rose-50 text-rose-700'
                                       : 'bg-amber-50 text-amber-700'
                                 }`}
                               >
-                                {item.isPaid ? 'Paid' : 'Not paid'}
+                                {item.isWaitingForCutoff ? 'Waiting' : item.isPaid ? 'Paid' : 'Not paid'}
                               </span>
                             </div>
                             <p className="text-sm text-[#64748B]">{item.cycleLabel}</p>
                             <div className="mt-1 space-y-1 text-xs text-[#64748B]">
-                              <p>Cutoff: {item.cutoffDeltaLabel}</p>
-                              <p>Due: {item.dueDeltaLabel}</p>
+                              <p>Cutoff: {item.cutoffDate
+                                ? `${item.cutoffDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${item.cutoffDeltaLabel})`
+                                : item.cutoffDeltaLabel}</p>
+                              <p>Due: {item.dueDate
+                                ? `${item.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${item.dueDeltaLabel})`
+                                : item.dueDeltaLabel}</p>
+                              {item.isWaitingForCutoff && (
+                                <p>Next cutoff: {item.nextCutoffDate
+                                  ? `${item.nextCutoffDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${item.nextCutoffDeltaLabel})`
+                                  : item.nextCutoffDeltaLabel}</p>
+                              )}
                             </div>
                           </div>
                         </div>
                         <div className="text-left lg:text-right">
                           <p className="text-xs font-medium uppercase tracking-wide text-[#94A3B8]">
-                            {item.source === 'fallback' ? 'Fallback Estimate' : 'Current Cycle'}
+                            {item.source === 'fallback'
+                              ? 'Fallback Estimate'
+                              : item.isWaitingForCutoff
+                                ? 'Waiting For Next Cutoff'
+                                : 'Last Closed Cycle'}
                           </p>
                           <p className={`text-sm font-semibold ${isSettled ? 'text-slate-500' : 'text-[#1F2933]'}`}>
                             Remaining: ${formatMoney(item.remainingDue)}

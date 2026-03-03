@@ -1,13 +1,22 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Receipt, CreditCard, Wallet, BarChart3, Settings, Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Home, Receipt, CreditCard, Wallet, BarChart3, Settings, Plus, FlaskConical, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { AddTransactionModal } from './AddTransactionModal';
+import { useAppDate } from '../contexts/AppDateContext';
 import '../../styles/components/Layout.css';
 
 export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [showAddTransaction, setShowAddTransaction] = useState(false);
+  const { isOverrideActive, dateOverride, setDateOverride } = useAppDate();
+
+  const isTester = useMemo(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem('leofy_user') || '{}');
+      return ['TESTER', 'ADMIN'].includes(user.role);
+    } catch { return false; }
+  }, []);
 
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
@@ -48,6 +57,7 @@ export function Layout() {
     { path: '/debit-cards', icon: Wallet, label: 'Debit Cards' },
     { path: '/statistics', icon: BarChart3, label: 'Stats' },
     { path: '/settings', icon: Settings, label: 'Settings' },
+    ...(isTester ? [{ path: '/tester', icon: FlaskConical, label: 'Tester' }] : []),
   ];
 
   return (
@@ -97,6 +107,16 @@ export function Layout() {
 
       {/* Main Content */}
       <main className="layout-main">
+        {isOverrideActive && (
+          <div className="layout-date-override-banner">
+            <span>
+              Date Override: {dateOverride?.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+            </span>
+            <button className="layout-date-override-clear" onClick={() => setDateOverride(null)}>
+              <X style={{ width: 14, height: 14 }} />
+            </button>
+          </div>
+        )}
         <Outlet />
       </main>
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, ResponsiveContainer, Legend, Tooltip, LabelList } from 'recharts';
 import { formatMoney } from '../utils/formatMoney';
 import { LoadingScreen } from './LoadingScreen';
+import { useAppDate } from '../contexts/AppDateContext';
 import '../../styles/components/Statistics.css';
 
 type ApiTx = {
@@ -130,8 +131,7 @@ function parseInputDate(value: string | null | undefined) {
   return Number.isFinite(date.getTime()) ? date : null;
 }
 
-function getDateRange(period: Period, customStartDate: string, customEndDate: string) {
-  const today = new Date();
+function getDateRange(period: Period, customStartDate: string, customEndDate: string, today: Date = new Date()) {
   const fallbackStart = startOfMonth(today);
   const fallbackEnd = endOfDay(today);
 
@@ -177,10 +177,9 @@ function periodLabel(period: Period) {
   }
 }
 
-function getSelectedPeriodDays(period: Period, start: Date, end: Date) {
+function getSelectedPeriodDays(period: Period, start: Date, end: Date, today: Date = new Date()) {
   const safeMs = Math.max(endOfDay(end).getTime() - startOfDay(start).getTime(), 0);
   const customDays = Math.max(1, Math.floor(safeMs / (24 * 60 * 60 * 1000)) + 1);
-  const today = new Date();
 
   switch (period) {
     case 'week':
@@ -226,6 +225,7 @@ function colorToGradient(color?: string | null) {
 }
 
 export function Statistics() {
+  const { getAppDate } = useAppDate();
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
   const [transactions, setTransactions] = useState<ApiTx[]>([]);
@@ -280,8 +280,8 @@ export function Statistics() {
   }, [API_BASE]);
 
   const selectedRange = useMemo(
-    () => getDateRange(period, customStartDate, customEndDate),
-    [period, customStartDate, customEndDate]
+    () => getDateRange(period, customStartDate, customEndDate, getAppDate()),
+    [period, customStartDate, customEndDate, getAppDate]
   );
 
   const filteredTx = useMemo(() => {
@@ -322,7 +322,7 @@ export function Statistics() {
 
   const creditCardUsage = useMemo(() => {
     const creditCards = cards.filter((c) => toNumber(c.credit_limit) > 0);
-    const today = new Date();
+    const today = getAppDate();
 
     return creditCards
       .map((card) => {
@@ -391,7 +391,7 @@ export function Statistics() {
         };
       })
       .sort((a, b) => b.amountDue - a.amountDue);
-  }, [cards, transactions]);
+  }, [cards, transactions, getAppDate]);
 
   const incomeExpenseData = useMemo(
     () => [
@@ -403,8 +403,8 @@ export function Statistics() {
 
   const netBalance = incomeTotal - expensesTotal;
   const selectedPeriodDays = useMemo(
-    () => getSelectedPeriodDays(period, selectedRange.start, selectedRange.end),
-    [period, selectedRange]
+    () => getSelectedPeriodDays(period, selectedRange.start, selectedRange.end, getAppDate()),
+    [period, selectedRange, getAppDate]
   );
   const avgDailySpend = expensesTotal / Math.max(1, selectedPeriodDays);
   const COLORS = ['#2DD4BF', '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981'];

@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { categories as mockCategories } from '../utils/mockData';
 import * as LucideIcons from 'lucide-react';
 import { formatMoney } from '../utils/formatMoney';
+import { useAppDate } from '../contexts/AppDateContext';
 import '../../styles/components/AddTransactionModal.css';
 
 interface AddTransactionModalProps {
@@ -87,6 +88,7 @@ function normalizeApiCategory(item: ApiCategory): UiCategory | null {
 }
 
 export function AddTransactionModal({ open, onClose }: AddTransactionModalProps) {
+  const { getAppDate } = useAppDate();
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
   const INSTALLMENT_OPTIONS = [3, 6, 9, 12, 18] as const;
 
@@ -367,6 +369,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
 
     try {
       setSubmitLoading(true);
+      const transactionDateIso = getAppDate().toISOString();
 
       const headers = authHeaders();
       headers.set('Content-Type', 'application/json');
@@ -397,7 +400,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
             amount: amountNum,
             category: 'Transfer',
             description: desc || 'Cash Transfer',
-            date: new Date().toISOString(),
+            date: transactionDateIso,
             card_id: toCardId,
             paymentMethod: 'cash',
             metadata: { category_name: 'Transfer', paymentMethod: 'cash', transferRole: 'incoming' },
@@ -415,7 +418,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
             toCardId,
             amount: amountNum,
             description: desc || 'Transfer',
-            date: new Date().toISOString(),
+            date: transactionDateIso,
           };
           const res = await fetch(`${API_BASE}/api/transfers`, {
             method: 'POST',
@@ -486,7 +489,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
         amount: amountNum,
         category: finalCategory,
         description: desc || finalCategory,
-        date: new Date().toISOString(),
+        date: transactionDateIso,
         category_id:
           selectedCategory && selectedCategory.source === 'api' && !isOtherCategory ? selectedCategory.id : null,
         card_id: paymentMethod === 'cash' ? null : cardId || null,
