@@ -104,6 +104,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
   const [cards, setCards] = useState<Card[]>([]);
   const [apiCategories, setApiCategories] = useState<UiCategory[]>([]);
   const [managedCategories, setManagedCategories] = useState<UiCategory[]>([]);
+  const [categoryUsage, setCategoryUsage] = useState<Record<string, number>>({});
   const [cardsLoading, setCardsLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
 
@@ -121,12 +122,23 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
     const desiredType = type === 'income' ? 'INCOME' : 'EXPENSE';
     const managedMatches = managedCategories.filter((cat) => cat.type === desiredType);
     const apiMatches = apiCategories.filter((cat) => cat.type === desiredType);
+    const baseCategories =
+      apiMatches.length > 0
+        ? apiMatches
+        : managedMatches.length > 0
+          ? managedMatches
+          : desiredType === 'EXPENSE'
+            ? DEFAULT_EXPENSE_CATEGORIES
+            : DEFAULT_INCOME_CATEGORIES;
 
-    if (managedMatches.length > 0) return managedMatches;
-    if (apiMatches.length > 0) return apiMatches;
-    if (desiredType === 'EXPENSE') return DEFAULT_EXPENSE_CATEGORIES;
-    return DEFAULT_INCOME_CATEGORIES;
-  }, [managedCategories, apiCategories, type]);
+    return [...baseCategories].sort((a, b) => {
+      const aUsage = categoryUsage[a.name.trim().toLowerCase()] || 0;
+      const bUsage = categoryUsage[b.name.trim().toLowerCase()] || 0;
+
+      if (aUsage !== bUsage) return bUsage - aUsage;
+      return a.name.localeCompare(b.name);
+    });
+  }, [managedCategories, apiCategories, categoryUsage, type]);
 
   const selectedCategory = useMemo(() => {
     return (
@@ -197,6 +209,47 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
   useEffect(() => {
     if (!open) return;
 
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/transactions`, {
+          headers: authHeaders(),
+        });
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) throw new Error(data?.error || 'Failed to load transactions');
+
+        const rawList: any[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.transactions)
+            ? data.transactions
+            : Array.isArray(data?.recentTransactions)
+              ? data.recentTransactions
+              : [];
+
+        const counts = rawList.reduce((acc: Record<string, number>, item: any) => {
+          const rawCategory =
+            (typeof item?.category === 'string' ? item.category : '') ||
+            (typeof item?.category_name === 'string' ? item.category_name : '') ||
+            (typeof item?.metadata?.category_name === 'string' ? item.metadata.category_name : '') ||
+            (typeof item?.metadata?.categoryName === 'string' ? item.metadata.categoryName : '');
+
+          const key = String(rawCategory || '').trim().toLowerCase();
+          if (!key) return acc;
+
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {});
+
+        setCategoryUsage(counts);
+      } catch {
+        setCategoryUsage({});
+      }
+    })();
+  }, [open, API_BASE]);
+
+  useEffect(() => {
+    if (!open) return;
+
     try {
       const raw = localStorage.getItem(CATEGORY_STORAGE_KEY);
       if (!raw) {
@@ -211,7 +264,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
       }
 
       const normalized = parsed
-        .map((item: any) => {
+        .map((item: any): UiCategory | null => {
           const name = String(item?.name || '').trim();
           if (!name) return null;
           return {
@@ -321,15 +374,15 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
       // ✅ TRANSFER
       if (type === 'transfer') {
         if (!cardId) {
-          alert('Please select FROM debit account');
+          alert('Please select FROM account');
           return;
         }
         if (!toCardId) {
           alert('Please select TO account');
           return;
         }
-        if (!debitCardsOnly.some((c) => c.id === cardId)) {
-          alert('FROM account must be a debit account');
+        if (cardId !== 'cash' && !debitCardsOnly.some((c) => c.id === cardId)) {
+          alert('FROM account must be a debit account or cash');
           return;
         }
         if (cardId === toCardId) {
@@ -337,22 +390,41 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
           return;
         }
 
-        const transferPayload = {
-          fromCardId: cardId,
-          toCardId,
-          amount: amountNum,
-          description: desc || 'Transfer',
-          date: new Date().toISOString(),
-        };
-
-        const res = await fetch(`${API_BASE}/api/transfers`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(transferPayload),
-        });
-
-        const data = await res.json().catch(() => null);
-        if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to create transfer');
+        // Cash → account: single INCOME transaction on destination (no debit card to deduct from)
+        if (cardId === 'cash') {
+          const cashPayload = {
+            type: 'income',
+            amount: amountNum,
+            category: 'Transfer',
+            description: desc || 'Cash Transfer',
+            date: new Date().toISOString(),
+            card_id: toCardId,
+            paymentMethod: 'cash',
+            metadata: { category_name: 'Transfer', paymentMethod: 'cash', transferRole: 'incoming' },
+          };
+          const res = await fetch(`${API_BASE}/api/transactions`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(cashPayload),
+          });
+          const data = await res.json().catch(() => null);
+          if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to create cash transfer');
+        } else {
+          const transferPayload = {
+            fromCardId: cardId,
+            toCardId,
+            amount: amountNum,
+            description: desc || 'Transfer',
+            date: new Date().toISOString(),
+          };
+          const res = await fetch(`${API_BASE}/api/transfers`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(transferPayload),
+          });
+          const data = await res.json().catch(() => null);
+          if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to create transfer');
+        }
 
         onClose();
         setTimeout(() => window.location.reload(), 50);
@@ -547,7 +619,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
             <div className="space-y-4">
               <div>
                 <label className="atm-label">
-                  From (Debit Account)
+                  From (Debit / Cash)
                 </label>
 
                 {cardsLoading ? (
@@ -560,6 +632,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
                     className="atm-select"
                   >
                     <option value="">Select account</option>
+                    <option value="cash">Cash</option>
                     {debitCardsOnly.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name} •••• {c.last4}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search, Pencil, LayoutGrid } from "lucide-react";
-import { getCategoryIcon } from "../utils/mockData";
+import { getCategoryIcon, categories as mockCategories } from "../utils/mockData";
 import { UiTransaction, normalizeTransactions } from "../utils/transactionsMapper";
 import * as LucideIcons from "lucide-react";
 import { formatMoney } from "../utils/formatMoney";
@@ -90,6 +90,31 @@ const getInstallmentsInfo = (row: any): InstallmentsInfo | null => {
     remainingMonths: Math.max(0, months - currentMonth),
   };
 };
+
+const TRANSFER_NAMES = new Set(['transfer', 'transfers', 'transferencia', 'transferencias']);
+
+function getIconNameForTx(tx: UiTransactionRow): string {
+  if (tx.categoryIcon) return tx.categoryIcon;
+
+  const cat = String(tx.category || '').trim().toLowerCase();
+
+  if (TRANSFER_NAMES.has(cat)) return 'ArrowLeftRight';
+
+  // Type-aware lookup in mockData categories
+  const typedMatch = mockCategories.find((c) => c.name.toLowerCase() === cat && c.type === tx.type);
+  if (typedMatch) return typedMatch.icon;
+
+  // Income-specific fallbacks for common names not in mockData
+  if (tx.type === 'income') {
+    if (cat.includes('salary') || cat.includes('wage') || cat.includes('sueldo')) return 'Briefcase';
+    if (cat.includes('freelance') || cat.includes('consulting')) return 'Laptop2';
+    if (cat.includes('bonus')) return 'Gift';
+    if (cat.includes('rent') || cat.includes('renta')) return 'Building2';
+    return 'CircleDollarSign';
+  }
+
+  return getCategoryIcon(tx.category);
+}
 
 export function Transactions() {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
@@ -377,8 +402,7 @@ export function Transactions() {
                     let IconComponent = LucideIcons.Circle;
 
                     try {
-                      const iconName = transaction.categoryIcon || getCategoryIcon(transaction.category);
-                      IconComponent = getIconComponent(iconName);
+                      IconComponent = getIconComponent(getIconNameForTx(transaction));
                     } catch {
                       IconComponent = LucideIcons.Circle;
                     }

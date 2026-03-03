@@ -503,52 +503,100 @@ export function Statistics() {
         </div>
       )}
 
-      <div className="stats-metrics-grid">
-        <div className="stats-metric-card">
-          <p className="stats-metric-label">Total Income</p>
-          <p className="stats-metric-value stats-metric-income">${formatMoney(incomeTotal)}</p>
+      <section className="stats-section stats-section-period">
+        <div className="stats-section-head">
+          <h2 className="stats-section-title">Period-Based Statistics</h2>
+          <p className="stats-section-subtitle">These cards and charts respond to the selected time range.</p>
         </div>
-        <div className="stats-metric-card">
-          <p className="stats-metric-label">Total Expenses</p>
-          <p className="stats-metric-value stats-metric-expense">${formatMoney(expensesTotal)}</p>
-        </div>
-        <div className="stats-metric-card">
-          <p className="stats-metric-label">Transactions</p>
-          <p className="stats-metric-value">{filteredTx.length}</p>
-        </div>
-        <div className="stats-metric-card">
-          <p className="stats-metric-label">Net Balance</p>
-          <p
-            className={`stats-metric-value ${
-              netBalance < 0 ? 'stats-metric-expense' : 'stats-metric-income'
-            }`}
-          >
-            ${formatMoney(netBalance)}
-          </p>
-        </div>
-      </div>
 
-      <div className="stats-grid-two">
-        <div className="stats-card">
-          <h3 className="stats-card-title">Income vs Expenses ({periodLabel(period)})</h3>
-          <div className="stats-chart-center">
+        <div className="stats-metrics-grid">
+          <div className="stats-metric-card">
+            <p className="stats-metric-label">Total Income</p>
+            <p className="stats-metric-value stats-metric-income">${formatMoney(incomeTotal)}</p>
+          </div>
+          <div className="stats-metric-card">
+            <p className="stats-metric-label">Total Expenses</p>
+            <p className="stats-metric-value stats-metric-expense">${formatMoney(expensesTotal)}</p>
+          </div>
+          <div className="stats-metric-card">
+            <p className="stats-metric-label">Transactions</p>
+            <p className="stats-metric-value">{filteredTx.length}</p>
+          </div>
+          <div className="stats-metric-card">
+            <p className="stats-metric-label">Net Balance</p>
+            <p
+              className={`stats-metric-value ${
+                netBalance < 0 ? 'stats-metric-expense' : 'stats-metric-income'
+              }`}
+            >
+              ${formatMoney(netBalance)}
+            </p>
+          </div>
+        </div>
+
+        <div className="stats-grid-two">
+          <div className="stats-card">
+            <h3 className="stats-card-title">Income vs Expenses ({periodLabel(period)})</h3>
+            <div className="stats-chart-center">
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={incomeExpenseData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {incomeExpenseData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number | string) => `$${formatMoney(toNumber(value))}`}
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                    }}
+                  />
+                  <Legend
+                    verticalAlign="bottom"
+                    height={36}
+                    formatter={(value) => <span className="stats-legend-text">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="stats-footer-row">
+              <span className="stats-metric-label">Avg Daily Spend</span>
+              <span className="stats-footer-value">${formatMoney(avgDailySpend)}</span>
+            </div>
+          </div>
+
+          <div className="stats-card">
+            <h3 className="stats-card-title">Spending by Category ({periodLabel(period)})</h3>
             <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={incomeExpenseData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {incomeExpenseData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
+              <BarChart data={spendingByCategoryChartData} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
+                <XAxis
+                  dataKey="name"
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  stroke="#94A3B8"
+                  style={{ fontSize: '12px' }}
+                />
+                <YAxis
+                  stroke="#94A3B8"
+                  style={{ fontSize: '12px' }}
+                  domain={[0, spendingByCategoryYMax]}
+                  allowDecimals={false}
+                  tickFormatter={(v: number) => `$${formatMoney(toNumber(v))}`}
+                />
                 <Tooltip
-                  formatter={(value: number | string) => `$${formatMoney(toNumber(value))}`}
+                  formatter={(value: number | string) => [`$${formatMoney(toNumber(value))}`, '']}
                   contentStyle={{
                     backgroundColor: '#fff',
                     border: '1px solid #E2E8F0',
@@ -556,128 +604,93 @@ export function Statistics() {
                     fontSize: '14px',
                   }}
                 />
-                <Legend
-                  verticalAlign="bottom"
-                  height={36}
-                  formatter={(value) => <span className="stats-legend-text">{value}</span>}
-                />
-              </PieChart>
+                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                  {spendingByCategoryChartData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                  <LabelList
+                    dataKey="value"
+                    position="top"
+                    formatter={(value: number | string) => `$${formatMoney(toNumber(value))}`}
+                    style={{ fill: '#1F2933', fontSize: 11, fontWeight: 500 }}
+                  />
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="stats-footer-row">
-            <span className="stats-metric-label">Avg Daily Spend</span>
-            <span className="stats-footer-value">${formatMoney(avgDailySpend)}</span>
-          </div>
         </div>
 
-        <div className="stats-card">
-          <h3 className="stats-card-title">Spending by Category ({periodLabel(period)})</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={spendingByCategoryChartData} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
-              <XAxis
-                dataKey="name"
-                angle={-45}
-                textAnchor="end"
-                height={80}
-                stroke="#94A3B8"
-                style={{ fontSize: '12px' }}
-              />
-              <YAxis
-                stroke="#94A3B8"
-                style={{ fontSize: '12px' }}
-                domain={[0, spendingByCategoryYMax]}
-                allowDecimals={false}
-                tickFormatter={(v: number) => `$${formatMoney(toNumber(v))}`}
-              />
-              <Tooltip
-                formatter={(value: number | string) => [`$${formatMoney(toNumber(value))}`, '']}
-                contentStyle={{
-                  backgroundColor: '#fff',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                }}
-              />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                {spendingByCategoryChartData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-                <LabelList
-                  dataKey="value"
-                  position="top"
-                  formatter={(value: number | string) => `$${formatMoney(toNumber(value))}`}
-                  style={{ fill: '#1F2933', fontSize: 11, fontWeight: 500 }}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="stats-card stats-card-gap">
+          <h3 className="stats-card-title">Category Breakdown ({periodLabel(period)})</h3>
+          <div className="stats-table-wrap">
+            <table className="stats-table">
+              <thead>
+                <tr className="stats-table-head-row">
+                  <th className="stats-th stats-th-left">Category</th>
+                  <th className="stats-th stats-th-right">Amount</th>
+                  <th className="stats-th stats-th-right">% of Total</th>
+                  <th className="stats-th stats-th-right">Transactions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {spendingByCategory.map((item, index) => {
+                  const percentage = expensesTotal > 0 ? (item.value / expensesTotal) * 100 : 0;
+
+                  return (
+                    <tr key={item.name} className="stats-tr">
+                      <td className="stats-td stats-td-left">
+                        <div className="stats-category-cell">
+                          <div className="stats-category-dot" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                          <span className="stats-card-name">{item.name}</span>
+                        </div>
+                      </td>
+                      <td className="stats-td stats-td-right stats-card-amount">${formatMoney(item.value)}</td>
+                      <td className="stats-td stats-td-right stats-metric-label">{percentage.toFixed(1)}%</td>
+                      <td className="stats-td stats-td-right stats-metric-label">{item.transactions}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      </section>
 
       {creditCardUsage.length > 0 && (
-        <div className="stats-card stats-card-gap">
-          <h3 className="stats-card-title">Credit Card Usage (Current Cycle)</h3>
-          <div className="stats-card-list">
-            {creditCardUsage.map((item) => {
-              return (
-                <div key={item.id}>
-                  <div className="stats-card-row-head">
-                    <div className="stats-card-row-left">
-                      <div className={`stats-card-chip bg-gradient-to-br ${item.colorClass}`}>
-                        <span className="stats-card-chip-text">....</span>
-                      </div>
-                      <span className="stats-card-name">{item.name}</span>
-                    </div>
-                    <div className="stats-card-row-right">
-                      <p className="stats-metric-label">Amount due</p>
-                      <p className="stats-card-amount">${formatMoney(item.amountDue)}</p>
-                      <p className="stats-card-percent">{item.usagePercent.toFixed(1)}% used</p>
-                    </div>
-                  </div>
-                  <div className="stats-progress-track">
-                    <div className="stats-progress-fill" style={{ width: `${item.clampedPercent}%` }} />
-                  </div>
-                </div>
-              );
-            })}
+        <section className="stats-section stats-section-live">
+          <div className="stats-section-head">
+            <h2 className="stats-section-title">Live Account Statistics</h2>
           </div>
-        </div>
-      )}
 
-      <div className="stats-card stats-card-gap">
-        <h3 className="stats-card-title">Category Breakdown ({periodLabel(period)})</h3>
-        <div className="stats-table-wrap">
-          <table className="stats-table">
-            <thead>
-              <tr className="stats-table-head-row">
-                <th className="stats-th stats-th-left">Category</th>
-                <th className="stats-th stats-th-right">Amount</th>
-                <th className="stats-th stats-th-right">% of Total</th>
-                <th className="stats-th stats-th-right">Transactions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {spendingByCategory.map((item, index) => {
-                const percentage = expensesTotal > 0 ? (item.value / expensesTotal) * 100 : 0;
-
+          <div className="stats-card">
+            <h3 className="stats-card-title">Credit Card Usage (Current Cycle)</h3>
+            <div className="stats-card-list">
+              {creditCardUsage.map((item) => {
                 return (
-                  <tr key={item.name} className="stats-tr">
-                    <td className="stats-td stats-td-left">
-                      <div className="stats-category-cell">
-                        <div className="stats-category-dot" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                  <div key={item.id}>
+                    <div className="stats-card-row-head">
+                      <div className="stats-card-row-left">
+                        <div className={`stats-card-chip bg-gradient-to-br ${item.colorClass}`}>
+                          <span className="stats-card-chip-text">....</span>
+                        </div>
                         <span className="stats-card-name">{item.name}</span>
                       </div>
-                    </td>
-                    <td className="stats-td stats-td-right stats-card-amount">${formatMoney(item.value)}</td>
-                    <td className="stats-td stats-td-right stats-metric-label">{percentage.toFixed(1)}%</td>
-                    <td className="stats-td stats-td-right stats-metric-label">{item.transactions}</td>
-                  </tr>
+                      <div className="stats-card-row-right">
+                        <p className="stats-metric-label">Amount due</p>
+                        <p className="stats-card-amount">${formatMoney(item.amountDue)}</p>
+                        <p className="stats-card-percent">{item.usagePercent.toFixed(1)}% used</p>
+                      </div>
+                    </div>
+                    <div className="stats-progress-track">
+                      <div className="stats-progress-fill" style={{ width: `${item.clampedPercent}%` }} />
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

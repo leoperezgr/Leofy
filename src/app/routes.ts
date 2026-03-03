@@ -59,8 +59,8 @@ export const router = createBrowserRouter([
       { path: "cards/:cardId", Component: CreditCardDetail },
       { path: "statistics", Component: Statistics },
       { path: "settings", Component: Settings },
+      { path: "settings/profile", Component: Settings },
       { path: "settings/categories", Component: SettingsCategories },
     ],
   },
 ]);
-

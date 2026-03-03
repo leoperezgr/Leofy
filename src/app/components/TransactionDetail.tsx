@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import * as LucideIcons from "lucide-react";
-import { categories } from "../utils/mockData";
+import { categories as mockCategories } from "../utils/mockData";
 import { UiTransaction, normalizeTransactions } from "../utils/transactionsMapper";
 import { formatMoney } from "../utils/formatMoney";
 import { LoadingScreen } from "./LoadingScreen";
@@ -15,6 +15,51 @@ type Card = {
   credit_limit?: number | string | null;
   color?: string | null;
 };
+
+type UiCategory = {
+  id: string;
+  name: string;
+  icon: string;
+  type: "EXPENSE" | "INCOME";
+  source: "api" | "managed" | "default" | "mock";
+};
+
+const CATEGORY_STORAGE_KEY = "leofy_settings_categories_v1";
+
+const DEFAULT_EXPENSE_CATEGORIES: UiCategory[] = [
+  { id: "default_groceries", name: "Groceries", icon: "ShoppingCart", type: "EXPENSE", source: "default" },
+  { id: "default_dining", name: "Dining", icon: "Utensils", type: "EXPENSE", source: "default" },
+  { id: "default_coffee", name: "Coffee", icon: "Coffee", type: "EXPENSE", source: "default" },
+  { id: "default_transportation", name: "Transportation", icon: "Car", type: "EXPENSE", source: "default" },
+  { id: "default_shopping", name: "Shopping", icon: "ShoppingBag", type: "EXPENSE", source: "default" },
+  { id: "default_bills", name: "Bills & Subscriptions", icon: "Receipt", type: "EXPENSE", source: "default" },
+  { id: "default_health", name: "Health & Personal", icon: "Heart", type: "EXPENSE", source: "default" },
+];
+
+const DEFAULT_INCOME_CATEGORIES: UiCategory[] = mockCategories
+  .filter((cat) => cat.type === "income")
+  .map((cat) => ({
+    id: `mock_${cat.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+    name: cat.name,
+    icon: cat.icon,
+    type: "INCOME" as const,
+    source: "mock" as const,
+  }));
+
+function getCategoryIconName(name: string) {
+  const normalized = String(name || "").trim().toLowerCase();
+
+  if (normalized.includes("grocery")) return "ShoppingCart";
+  if (normalized.includes("dining") || normalized.includes("food") || normalized.includes("restaurant")) return "Utensils";
+  if (normalized.includes("coffee")) return "Coffee";
+  if (normalized.includes("transport") || normalized.includes("gas") || normalized.includes("car")) return "Car";
+  if (normalized.includes("shop")) return "ShoppingBag";
+  if (normalized.includes("bill") || normalized.includes("subscription")) return "Receipt";
+  if (normalized.includes("health") || normalized.includes("personal")) return "Heart";
+
+  const fromMock = mockCategories.find((cat) => cat.name.trim().toLowerCase() === normalized);
+  return fromMock?.icon || "Tag";
+}
 
 function formatAmountInput(value: string) {
   if (!value) return "";
@@ -64,6 +109,8 @@ export function TransactionDetail() {
 
   const [tx, setTx] = useState<UiTransaction | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
+  const [apiCategories, setApiCategories] = useState<UiCategory[]>([]);
+  const [managedCategories, setManagedCategories] = useState<UiCategory[]>([]);
   const [cardsLoading, setCardsLoading] = useState(false);
   const [cardsLoaded, setCardsLoaded] = useState(false);
   const [rawTx, setRawTx] = useState<any | null>(null);
@@ -82,9 +129,15 @@ export function TransactionDetail() {
   );
 
   const filteredCategories = useMemo(() => {
-    const t = tx?.type === "income" ? "income" : "expense";
-    return categories.filter((c) => c.type === t);
-  }, [tx?.type]);
+    const desiredType = tx?.type === "income" ? "INCOME" : "EXPENSE";
+    const managedMatches = managedCategories.filter((cat) => cat.type === desiredType);
+    const apiMatches = apiCategories.filter((cat) => cat.type === desiredType);
+
+    if (apiMatches.length > 0) return apiMatches;
+    if (managedMatches.length > 0) return managedMatches;
+    if (desiredType === "EXPENSE") return DEFAULT_EXPENSE_CATEGORIES;
+    return DEFAULT_INCOME_CATEGORIES;
+  }, [apiCategories, managedCategories, tx?.type]);
 
   const creditCardsOnly = useMemo(() => {
     return cards.filter((c) => c.credit_limit !== null && c.credit_limit !== undefined);
@@ -163,6 +216,82 @@ export function TransactionDetail() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CATEGORY_STORAGE_KEY);
+      if (!raw) {
+        setManagedCategories([]);
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        setManagedCategories([]);
+        return;
+      }
+
+      const normalized = parsed
+        .map((item: any): UiCategory | null => {
+          const name = String(item?.name || "").trim();
+          if (!name) return null;
+
+          return {
+            id: String(item?.id || `managed_${name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`),
+            name,
+            icon: String(item?.icon || getCategoryIconName(name)),
+            type: String(item?.type || "").toLowerCase() === "income" ? "INCOME" : "EXPENSE",
+            source: "managed",
+          };
+        })
+        .filter((item): item is UiCategory => Boolean(item));
+
+      setManagedCategories(normalized);
+    } catch {
+      setManagedCategories([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/categories`, {
+          method: "GET",
+          headers: authHeaders,
+        });
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) throw new Error(data?.error || "Failed to load categories");
+
+        const normalized = Array.isArray(data)
+          ? data
+              .map((item: any): UiCategory | null => {
+                const name = String(item?.name || "").trim();
+                if (!name) return null;
+
+                return {
+                  id: String(item?.id ?? name),
+                  name,
+                  icon: getCategoryIconName(name),
+                  type: String(item?.type || "").toUpperCase() === "INCOME" ? "INCOME" : "EXPENSE",
+                  source: "api",
+                };
+              })
+              .filter((item: UiCategory | null): item is UiCategory => Boolean(item))
+          : [];
+
+        if (!cancelled) setApiCategories(normalized);
+      } catch {
+        if (!cancelled) setApiCategories([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [API_BASE, authHeaders]);
 
   useEffect(() => {
     loadCards();
@@ -441,9 +570,7 @@ export function TransactionDetail() {
           <div>
             <label className="block text-sm font-medium text-[#64748B] mb-3">Category</label>
             <div className="grid grid-cols-4 gap-2">
-              {filteredCategories
-                .filter((cat) => cat.type === tx.type)
-                .map((cat) => {
+              {filteredCategories.map((cat) => {
                   const IconComponent = getIconComponent(cat.icon);
                   return (
                     <button
