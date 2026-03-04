@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import { LoadingScreen } from "./LoadingScreen";
+import "../../styles/components/TransactionDetail.css";
 
 type Card = {
   id: string | number;
@@ -226,41 +227,38 @@ export function TransferDetail() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 lg:p-8">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <Link
-          to="/transactions"
-          className="inline-flex items-center gap-2 text-[#64748B] hover:text-[#1F2933] transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span className="font-medium">Back to Transactions</span>
+    <div className="td-page">
+      <div className="td-top-bar">
+        <Link to="/transactions" className="td-back-link">
+          <ArrowLeft className="td-back-icon" />
+          <span className="td-back-text">Back to Transactions</span>
         </Link>
 
-        <div className="text-right">
-          <p className="text-sm text-[#64748B]">Transfer</p>
-          <p className="font-semibold text-[#1F2933]">#{transferId}</p>
+        <div className="td-tx-id-wrap">
+          <p className="td-tx-id-label">Transfer</p>
+          <p className="td-tx-id-value">#{transferId}</p>
         </div>
       </div>
 
       {error && (
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-6">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="td-error-box">
+          <p className="td-error-text">{error}</p>
         </div>
       )}
 
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-[#1F2933]">Edit Transfer</h1>
-          <p className="text-sm text-[#64748B] mt-1">
+      <div className="td-card">
+        <div className="td-card-header">
+          <h1 className="td-title">Edit Transfer</h1>
+          <p className="td-subtitle">
             Update amount, description, date, and linked accounts together.
           </p>
         </div>
 
-        <form onSubmit={onSave} className="space-y-5">
+        <form onSubmit={onSave} className="td-form">
           <div>
-            <label className="block text-sm font-medium text-[#64748B] mb-2">Amount</label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-4 flex items-center text-[#64748B]">$</span>
+            <label className="td-label">Amount</label>
+            <div className="td-amount-wrap">
+              <span className="td-currency">$</span>
               <input
                 type="text"
                 inputMode="decimal"
@@ -271,49 +269,49 @@ export function TransferDetail() {
                   setAmount(cleaned);
                 }}
                 placeholder="0.00"
-                className="w-full pl-8 pr-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
+                className="td-amount-input"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#64748B] mb-2">Description</label>
+            <label className="td-label">Description</label>
             <input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g., Credit card payment"
-              className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
+              className="td-text-input"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#64748B] mb-2">Date</label>
+            <label className="td-label">Date</label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
+              className="td-text-input"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#64748B] mb-3">From Account</label>
-            <div className="space-y-2">
+            <label className="td-label td-label-spaced">From Account</label>
+            <div className="td-card-list">
               {debitCardsOnly.map((card) => (
                 <button
                   key={stringifyCardId(card.id)}
                   type="button"
                   onClick={() => setFromCardId(stringifyCardId(card.id))}
-                  className={`w-full rounded-xl border-2 p-4 text-left transition-all ${
+                  className={`td-card-btn ${
                     fromCardId === stringifyCardId(card.id)
-                      ? "border-[#2DD4BF] bg-[#2DD4BF]/5"
-                      : "border-gray-200 hover:border-gray-300"
+                      ? "td-card-btn-active"
+                      : "td-card-btn-inactive"
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium text-[#1F2933]">{card.name}</span>
-                    <span className="text-sm text-[#64748B]">•••• {card.last4 ?? "----"}</span>
+                  <div className="td-card-row">
+                    <span className="td-card-name">{card.name}</span>
+                    <span className="td-card-last4">•••• {card.last4 ?? "----"}</span>
                   </div>
                 </button>
               ))}
@@ -321,55 +319,52 @@ export function TransferDetail() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#64748B] mb-3">To Account</label>
-            <div className="space-y-2">
+            <label className="td-label td-label-spaced">To Account</label>
+            <div className="td-card-list">
               {cards.map((card) => (
                 <button
                   key={stringifyCardId(card.id)}
                   type="button"
                   onClick={() => setToCardId(stringifyCardId(card.id))}
-                  className={`w-full rounded-xl border-2 p-4 text-left transition-all ${
+                  className={`td-card-btn ${
                     toCardId === stringifyCardId(card.id)
-                      ? "border-[#2DD4BF] bg-[#2DD4BF]/5"
-                      : "border-gray-200 hover:border-gray-300"
+                      ? "td-card-btn-active"
+                      : "td-card-btn-inactive"
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium text-[#1F2933]">{card.name}</span>
-                    <span className="text-sm text-[#64748B]">•••• {card.last4 ?? "----"}</span>
+                  <div className="td-card-row">
+                    <span className="td-card-name">{card.name}</span>
+                    <span className="td-card-last4">•••• {card.last4 ?? "----"}</span>
                   </div>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="td-actions-row">
             <button
               type="submit"
               disabled={saving || deleting}
-              className="flex-1 inline-flex items-center justify-center gap-2 py-4 bg-[#2DD4BF] text-white font-semibold rounded-xl hover:bg-[#14B8A6] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+              className="td-save-btn"
             >
-              <Save className="w-4 h-4" />
+              <Save className="td-save-icon" />
               {saving ? "Saving..." : "Save Changes"}
             </button>
 
-            <Link
-              to="/transactions"
-              className="flex-1 inline-flex items-center justify-center py-4 bg-gray-50 text-[#1F2933] font-semibold rounded-xl hover:bg-gray-100 transition-colors"
-            >
+            <Link to="/transactions" className="td-cancel-link">
               Cancel
             </Link>
           </div>
         </form>
 
-        <div className="mt-8 border-t border-gray-100 pt-6">
+        <div className="td-danger-zone">
           <button
             type="button"
             onClick={onDelete}
             disabled={saving || deleting}
-            className="inline-flex items-center justify-center gap-2 py-3 px-4 bg-red-50 text-red-700 font-semibold rounded-xl hover:bg-red-100 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+            className="td-delete-btn"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="td-delete-icon" />
             {deleting ? "Deleting..." : "Delete Transfer"}
           </button>
         </div>

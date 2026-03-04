@@ -1,6 +1,6 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, AlertTriangle, Pencil } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Pencil, LayoutGrid } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import * as LucideIcons from "lucide-react";
 import { formatMoney } from "../utils/formatMoney";
@@ -73,11 +73,37 @@ export function CreditCardDetail() {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
   const { cardId } = useParams<{ cardId: string }>();
 
+  const LONG_PRESS_MS = 450;
+
   const [card, setCard] = useState<ApiCard | null>(null);
   const [tx, setTx] = useState<ApiTx[]>([]);
   const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mobileEditTxId, setMobileEditTxId] = useState<string | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isTouchDevice = () =>
+    typeof window !== "undefined" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
+  const clearLongPress = () => {
+    if (!longPressTimerRef.current) return;
+    clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+  };
+
+  const handleRowTouchStart = (rowId: string) => {
+    if (!isTouchDevice()) return;
+    clearLongPress();
+    longPressTimerRef.current = setTimeout(() => {
+      setMobileEditTxId(rowId);
+      longPressTimerRef.current = null;
+    }, LONG_PRESS_MS);
+  };
+
+  const handleRowTouchEnd = () => {
+    clearLongPress();
+  };
 
   const authHeaders = (): Headers => {
     const token = localStorage.getItem("leofy_token");
@@ -146,6 +172,30 @@ export function CreditCardDetail() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [API_BASE, cardId]);
+
+  useEffect(() => () => clearLongPress(), []);
+
+  useEffect(() => {
+    if (!mobileEditTxId) return;
+
+    const handleOutsidePress = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as HTMLElement | null;
+      const selectedRow = document.querySelector(".cd-row-selected");
+      if (!selectedRow) {
+        setMobileEditTxId(null);
+        return;
+      }
+      if (target && selectedRow.contains(target)) return;
+      setMobileEditTxId(null);
+    };
+
+    document.addEventListener("mousedown", handleOutsidePress);
+    document.addEventListener("touchstart", handleOutsidePress);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsidePress);
+      document.removeEventListener("touchstart", handleOutsidePress);
+    };
+  }, [mobileEditTxId]);
 
   const creditLimit = useMemo(() => toNumber(card?.credit_limit), [card]);
   const isCredit = creditLimit > 0;
@@ -474,18 +524,34 @@ export function CreditCardDetail() {
         <h3 className="cd-section-title">Monthly Spending</h3>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={last30Days}>
+            <defs>
+              <linearGradient id="chartLineGradient" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#2dd4bf" />
+                <stop offset="100%" stopColor="#3b82f6" />
+              </linearGradient>
+            </defs>
             <XAxis dataKey="date" stroke="#94A3B8" style={{ fontSize: "12px" }} />
             <YAxis stroke="#94A3B8" style={{ fontSize: "12px" }} />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#fff",
-                border: "1px solid #E2E8F0",
-                borderRadius: "8px",
+                background: "rgba(255, 255, 255, 0.8)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                border: "1px solid rgba(255, 255, 255, 0.5)",
+                borderRadius: "12px",
+                boxShadow: "0 4px 16px rgba(15, 23, 42, 0.08)",
                 fontSize: "14px",
               }}
               formatter={(value: number) => [`$${formatMoney(Number(value))}`, "Amount"]}
             />
-            <Line type="monotone" dataKey="amount" stroke="#3B82F6" strokeWidth={2} dot={{ r: 3 }} />
+            <Line
+              type="monotone"
+              dataKey="amount"
+              stroke="url(#chartLineGradient)"
+              strokeWidth={2.5}
+              dot={{ r: 3, fill: "#2dd4bf", stroke: "#fff", strokeWidth: 1.5 }}
+              activeDot={{ r: 5, fill: "#3b82f6", stroke: "#fff", strokeWidth: 2 }}
+            />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -507,7 +573,11 @@ export function CreditCardDetail() {
                     key={transaction.id}
                     className={`cd-transaction-item ${
                       index !== cardTransactions.length - 1 ? "cd-transaction-item-divider" : ""
-                    }`}
+                    } ${mobileEditTxId === transaction.id ? "cd-row-selected" : ""}`}
+                    onTouchStart={() => handleRowTouchStart(transaction.id)}
+                    onTouchEnd={handleRowTouchEnd}
+                    onTouchCancel={handleRowTouchEnd}
+                    onTouchMove={handleRowTouchEnd}
                   >
                     <div className="cd-transaction-left">
                       <div className="cd-transaction-icon-wrap">
@@ -539,6 +609,35 @@ export function CreditCardDetail() {
                       <p className="cd-transaction-date">
                         {new Date(transaction.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                       </p>
+                      <Link
+                        to={`/transactions/${transaction.id}`}
+                        state={{
+                          paymentMethod: "credit",
+                          cardId: cardId ?? null,
+                        }}
+                        className="cd-edit-link-desktop"
+                        aria-label="Edit transaction"
+                        title="Edit transaction"
+                      >
+                        <Pencil className="cd-edit-icon" />
+                      </Link>
+                      {mobileEditTxId === transaction.id && (
+                        <div className="cd-mobile-actions">
+                          <Link
+                            to={`/transactions/${transaction.id}`}
+                            state={{
+                              paymentMethod: "credit",
+                              cardId: cardId ?? null,
+                            }}
+                            className="cd-mobile-edit-grid"
+                            aria-label="Edit transaction"
+                            title="Edit transaction"
+                          >
+                            <LayoutGrid className="cd-mobile-grid-icon" />
+                            <span>Edit</span>
+                          </Link>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
