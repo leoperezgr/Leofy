@@ -7,61 +7,23 @@ import { formatMoney } from "../utils/formatMoney";
 import { getCategoryIcon } from "../utils/mockData"; // si ya tienes un mapper real, lo cambiamos luego
 import { useAppDate } from "../contexts/AppDateContext";
 import { LoadingScreen } from "./LoadingScreen";
+import {
+  type ApiTx,
+  type ApiCard,
+  toId,
+  toNumber,
+  startOfDay,
+  cardColorToGradient,
+  getInstallmentsInfo,
+  computeThreeCycleAmounts,
+} from "../utils/creditCycleCalculator";
 import "../../styles/components/CardDetail.css";
-
-type ApiCard = {
-  id: string | number;
-  name: string;
-  last4: string | null;
-  credit_limit: number | string | null;
-  closing_day?: number | string | null;
-  due_day?: number | string | null;
-  color?: string | null;
-};
 
 type ApiCategory = {
   id: string | number;
   name: string;
   icon?: string | null;
 };
-
-type InstallmentsInfo = {
-  months: number;
-  monthlyAmount: number;
-  currentMonth: number;
-  remainingMonths: number;
-};
-
-type ApiTx = {
-  id: string | number;
-  type: "INCOME" | "EXPENSE" | "income" | "expense";
-  amount: number | string;
-  description: string | null;
-  occurred_at: string;
-  category?: string | { name?: string | null; icon?: string | null } | null;
-  category_name?: string | null; // por si backend manda nombre
-  category_id?: string | number | null;
-  categoryId?: string | number | null;
-  card_id?: string | number | null;
-  cardId?: string | number | null;
-  metadata?: {
-    category_name?: string | null;
-    categoryName?: string | null;
-    installments?: {
-      months?: number | string;
-      monthlyAmount?: number | string;
-      startAt?: string;
-    } | null;
-  } | null;
-};
-
-function toId(v: string | number) {
-  return typeof v === "number" ? String(v) : String(v);
-}
-function toNumber(v: any) {
-  const n = typeof v === "string" ? Number(v) : Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
 
 function normalizeCategoryKey(value?: string | null) {
   return String(value || "").trim().toLowerCase();
@@ -105,133 +67,6 @@ function getCategoryIconName(categoryName: string) {
   return iconFromMock || "Tag";
 }
 
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-function safeDayInMonth(year: number, monthIndex0: number, day: number) {
-  const lastDay = new Date(year, monthIndex0 + 1, 0).getDate();
-  const safeDay = Math.min(Math.max(1, Math.trunc(day)), lastDay);
-  return new Date(year, monthIndex0, safeDay);
-}
-
-function addMonths(date: Date, n: number) {
-  const firstTargetMonth = new Date(date.getFullYear(), date.getMonth() + n, 1);
-  return safeDayInMonth(firstTargetMonth.getFullYear(), firstTargetMonth.getMonth(), date.getDate());
-}
-
-function diffMonths(a: Date, b: Date) {
-  return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
-}
-
-function isBetweenInclusive(date: Date, start: Date, end: Date) {
-  const x = startOfDay(date).getTime();
-  return x >= startOfDay(start).getTime() && x <= startOfDay(end).getTime();
-}
-
-function computeAmountDueForRange(transactions: ApiTx[], currentCardId: string, start: Date, end: Date) {
-  const due = transactions.reduce((sum, t) => {
-    const type = String((t as any).type || "").toUpperCase();
-
-    const cid = (t as any).card_id ?? (t as any).cardId ?? null;
-    if (!cid || toId(cid) !== currentCardId) return sum;
-
-    const amount = toNumber((t as any).amount);
-    if (amount <= 0) return sum;
-
-    const occurredAt = new Date((t as any).occurred_at);
-    if (Number.isNaN(occurredAt.getTime())) return sum;
-
-    if (type === "INCOME") {
-      return isBetweenInclusive(occurredAt, start, end) ? sum - amount : sum;
-    }
-    if (type !== "EXPENSE") return sum;
-
-    const installments = (t as any)?.metadata?.installments;
-    if (installments && typeof installments === "object") {
-      const months = Math.trunc(toNumber((installments as any).months));
-      if (months < 2 || months > 60) return sum;
-
-      const monthlyAmount =
-        (installments as any).monthlyAmount !== undefined
-          ? toNumber((installments as any).monthlyAmount)
-          : toNumber(Number((amount / months).toFixed(2)));
-      if (monthlyAmount <= 0) return sum;
-
-      const startAtRaw = (installments as any).startAt || (t as any).occurred_at;
-      const startAtDate = new Date(startAtRaw);
-      if (Number.isNaN(startAtDate.getTime())) return sum;
-
-      const monthsElapsed = diffMonths(startOfDay(startAtDate), end);
-      if (monthsElapsed >= 0 && monthsElapsed < months) {
-        return sum + monthlyAmount;
-      }
-      return sum;
-    }
-
-    return isBetweenInclusive(occurredAt, start, end) ? sum + amount : sum;
-  }, 0);
-
-  return Math.max(0, due);
-}
-
-function getInstallmentsInfo(row: ApiTx, referenceDate: Date): InstallmentsInfo | null {
-  const installments = row?.metadata?.installments;
-  if (!installments || typeof installments !== "object") return null;
-
-  const months = Math.trunc(toNumber((installments as any).months));
-  if (months < 2 || months > 60) return null;
-
-  const amount = toNumber(row?.amount);
-  const monthlyAmountRaw =
-    (installments as any).monthlyAmount !== undefined
-      ? toNumber((installments as any).monthlyAmount)
-      : Number((amount / months).toFixed(2));
-  if (monthlyAmountRaw <= 0) return null;
-
-  const startRaw = (installments as any).startAt || row?.occurred_at;
-  const startAt = startRaw ? new Date(startRaw) : null;
-  const now = referenceDate;
-
-  let currentMonth = 1;
-  if (startAt && !Number.isNaN(startAt.getTime())) {
-    const monthsElapsed =
-      (now.getFullYear() - startAt.getFullYear()) * 12 + (now.getMonth() - startAt.getMonth());
-    currentMonth = Math.max(1, Math.min(months, monthsElapsed + 1));
-  }
-
-  return {
-    months,
-    monthlyAmount: Number(monthlyAmountRaw.toFixed(2)),
-    currentMonth,
-    remainingMonths: Math.max(0, months - currentMonth),
-  };
-}
-
-function colorToGradient(color?: string | null) {
-  switch ((color || "OTHER").toUpperCase()) {
-    case "RED":
-      return "from-red-500 to-rose-600";
-    case "ORANGE":
-      return "from-orange-500 to-amber-600";
-    case "BLUE":
-      return "from-blue-500 to-sky-600";
-    case "GOLD":
-      return "from-yellow-500 to-amber-600";
-    case "BLACK":
-      return "from-zinc-900 to-zinc-700";
-    case "PLATINUM":
-      return "from-slate-500 to-slate-700";
-    case "SILVER":
-      return "from-gray-400 to-gray-600";
-    case "PURPLE":
-      return "from-purple-500 to-fuchsia-600";
-    case "GREEN":
-      return "from-emerald-500 to-teal-600";
-    default:
-      return "from-[#2DD4BF] to-[#14B8A6]";
-  }
-}
 
 export function CreditCardDetail() {
   const { getAppDate } = useAppDate();
@@ -378,7 +213,7 @@ export function CreditCardDetail() {
           category: categoryResolved,
           icon: iconResolved,
           date: t.occurred_at,
-          installments: getInstallmentsInfo(t, getAppDate()),
+          installments: getInstallmentsInfo(t, getAppDate(), closingDay),
         };
       });
   }, [tx, cardId, categoryById, categoryByName, getAppDate]);
@@ -401,59 +236,25 @@ export function CreditCardDetail() {
   const usagePercent = creditLimit > 0 ? (usedAmount / creditLimit) * 100 : 0;
   const isHighUsage = usagePercent > 80;
 
-  const today = useMemo(() => startOfDay(getAppDate()), [getAppDate]);
-  const nextClosingDate = useMemo(() => {
-    if (!isCredit || closingDay <= 0) return null;
-    const candidate = safeDayInMonth(today.getFullYear(), today.getMonth(), closingDay);
-    if (today.getTime() <= candidate.getTime()) return candidate;
-    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    return safeDayInMonth(nextMonth.getFullYear(), nextMonth.getMonth(), closingDay);
-  }, [isCredit, closingDay, today]);
-  const lastClosingDate = useMemo(() => {
-    if (!isCredit || closingDay <= 0) return null;
-    const candidate = safeDayInMonth(today.getFullYear(), today.getMonth(), closingDay);
-    if (today.getTime() >= candidate.getTime()) return candidate;
-    const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    return safeDayInMonth(previousMonth.getFullYear(), previousMonth.getMonth(), closingDay);
-  }, [isCredit, closingDay, today]);
-  const paymentDueDate = useMemo(() => {
-    if (!isCredit || dueDay <= 0 || !lastClosingDate) return null;
-    return safeDayInMonth(lastClosingDate.getFullYear(), lastClosingDate.getMonth() + 1, dueDay);
-  }, [isCredit, dueDay, lastClosingDate]);
+  const cycleAmounts = useMemo(() => {
+    if (!cardId || !isCredit || !card) return null;
+    return computeThreeCycleAmounts(card, tx, getAppDate());
+  }, [card, tx, cardId, isCredit, getAppDate]);
 
-  const pastCycleEnd = useMemo(() => (lastClosingDate ? startOfDay(lastClosingDate) : null), [lastClosingDate]);
-  const pastCycleStart = useMemo(() => {
-    if (!pastCycleEnd) return null;
-    const prevClosing = addMonths(pastCycleEnd, -1);
-    const nextDay = new Date(prevClosing.getFullYear(), prevClosing.getMonth(), prevClosing.getDate() + 1);
-    return startOfDay(nextDay);
-  }, [pastCycleEnd]);
-
-  const cycleEnd = useMemo(() => (nextClosingDate ? startOfDay(nextClosingDate) : null), [nextClosingDate]);
-  const cycleStart = useMemo(() => {
-    if (!cycleEnd) return null;
-    const prevClosing = addMonths(cycleEnd, -1);
-    const nextDay = new Date(prevClosing.getFullYear(), prevClosing.getMonth(), prevClosing.getDate() + 1);
-    return startOfDay(nextDay);
-  }, [cycleEnd]);
-  const nextCycleStart = useMemo(() => {
-    if (!cycleEnd) return null;
-    return startOfDay(new Date(cycleEnd.getFullYear(), cycleEnd.getMonth(), cycleEnd.getDate() + 1));
-  }, [cycleEnd]);
-  const nextCycleEnd = useMemo(() => (cycleEnd ? startOfDay(addMonths(cycleEnd, 1)) : null), [cycleEnd]);
-
-  const amountDueCycle = useMemo(() => {
-    if (!cardId || !isCredit || !cycleStart || !cycleEnd) return 0;
-    return computeAmountDueForRange(tx, String(cardId), cycleStart, cycleEnd);
-  }, [tx, cardId, isCredit, cycleStart, cycleEnd]);
-  const amountPastCycle = useMemo(() => {
-    if (!cardId || !isCredit || !pastCycleStart || !pastCycleEnd) return 0;
-    return computeAmountDueForRange(tx, String(cardId), pastCycleStart, pastCycleEnd);
-  }, [tx, cardId, isCredit, pastCycleStart, pastCycleEnd]);
-  const amountDueNextCycle = useMemo(() => {
-    if (!cardId || !isCredit || !nextCycleStart || !nextCycleEnd) return 0;
-    return computeAmountDueForRange(tx, String(cardId), nextCycleStart, nextCycleEnd);
-  }, [tx, cardId, isCredit, nextCycleStart, nextCycleEnd]);
+  const amountPastCycle = cycleAmounts?.pastCycleRemainingAmount ?? 0;
+  const amountDueCycle = cycleAmounts?.currentCycleRemainingAmount ?? 0;
+  const amountDueNextCycle = cycleAmounts?.nextCycleRemainingAmount ?? 0;
+  const amountPaidPastCycle = cycleAmounts?.pastCyclePaidAmount ?? 0;
+  const amountPaidCurrentCycle = cycleAmounts?.currentCyclePaidAmount ?? 0;
+  const amountPaidNextCycle = cycleAmounts?.nextCyclePaidAmount ?? 0;
+  const pastCycleStart = cycleAmounts?.pastCycle?.start ?? null;
+  const pastCycleEnd = cycleAmounts?.pastCycle?.end ?? null;
+  const cycleStart = cycleAmounts?.currentCycle?.start ?? null;
+  const cycleEnd = cycleAmounts?.currentCycle?.end ?? null;
+  const nextCycleStart = cycleAmounts?.nextCycle?.start ?? null;
+  const nextCycleEnd = cycleAmounts?.nextCycle?.end ?? null;
+  const nextClosingDate = cycleEnd ? startOfDay(cycleEnd) : null;
+  const paymentDueDate = cycleAmounts?.dueDate ?? null;
 
   const last30Days = useMemo(() => {
     const days = Array.from({ length: 30 }, (_, i) => {
@@ -529,7 +330,7 @@ export function CreditCardDetail() {
     );
   }
 
-  const gradient = colorToGradient(card.color);
+  const gradient = cardColorToGradient(card.color);
   const available = Math.max(0, creditLimit - usedAmount);
 
   return (
@@ -566,44 +367,54 @@ export function CreditCardDetail() {
         <div className="cd-box cd-box-spacing">
           <div className="cd-stats-grid cd-cycle-stats-grid">
             <div className="cd-cycle-stat">
-              <p className="cd-label">Closing & Payment</p>
-              <p className="cd-stat-value">Close {closingDay || "--"} / Pay {dueDay || "--"}</p>
-              <p className="cd-subtitle">
+              <p className="cd-label">Billing Cycle</p>
+              <p className="cd-stat-value">{closingDay || "--"} / {dueDay || "--"}</p>
+              <p className="cd-cycle-meta">Close day / Pay day</p>
+              <p className="cd-cycle-meta">
                 {nextClosingDate
                   ? `Next close: ${nextClosingDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
                   : "Closing date not set"}
               </p>
             </div>
             <div className="cd-cycle-stat">
-              <p className="cd-label">Amount past cycle</p>
+              <p className="cd-label">Last Statement</p>
               <p className="cd-stat-value">${formatMoney(amountPastCycle)}</p>
-              <p className="cd-subtitle">
+              <p className="cd-cycle-meta">
                 {pastCycleStart && pastCycleEnd
                   ? `${pastCycleStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${pastCycleEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
                   : "Last statement"}
               </p>
-              <p className="cd-subtitle">
+              <p className="cd-cycle-meta-highlight">
                 {paymentDueDate
                   ? `Pay before ${paymentDueDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
                   : "Pay before due date"}
               </p>
+              <p className="cd-cycle-meta">
+                Paid: ${formatMoney(amountPaidPastCycle)}
+              </p>
             </div>
             <div className="cd-cycle-stat">
-              <p className="cd-label">Current cycle projected</p>
+              <p className="cd-label">Current Cycle</p>
               <p className="cd-stat-value">${formatMoney(amountDueCycle)}</p>
-              <p className="cd-subtitle">
+              <p className="cd-cycle-meta">
                 {cycleStart && cycleEnd
                   ? `${cycleStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${cycleEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
                   : "Current cycle"}
               </p>
+              <p className="cd-cycle-meta">
+                Paid: ${formatMoney(amountPaidCurrentCycle)}
+              </p>
             </div>
             <div className="cd-cycle-stat">
-              <p className="cd-label">Projected next cycle</p>
+              <p className="cd-label">Next Cycle</p>
               <p className="cd-stat-value">${formatMoney(amountDueNextCycle)}</p>
-              <p className="cd-subtitle">
+              <p className="cd-cycle-meta">
                 {nextCycleStart && nextCycleEnd
                   ? `${nextCycleStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${nextCycleEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
                   : "Next cycle"}
+              </p>
+              <p className="cd-cycle-meta">
+                Paid: ${formatMoney(amountPaidNextCycle)}
               </p>
             </div>
           </div>

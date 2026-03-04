@@ -185,10 +185,40 @@
 }
 
 .cd-cycle-stat {
-  border: 1px solid #e2e8f0;
-  border-radius: 0.85rem;
-  background: #f8fafc;
-  padding: 0.9rem;
+  border: 1px solid #f1f5f9;
+  border-radius: 0.75rem;
+  background: #fafbfc;
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.cd-cycle-stat .cd-label {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.cd-cycle-stat .cd-stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+.cd-cycle-meta {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.cd-cycle-meta-highlight {
+  color: #0d9488;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .cd-label,
