@@ -129,24 +129,36 @@ export function CreditCards() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [API_BASE]);
 
-  // calcular usedAmount por card_id (solo EXPENSE)
+  // calcular usedAmount neto por card_id (EXPENSE suma, INCOME resta)
   const usedByCard = useMemo(() => {
-    const map = new Map<string, number>();
+    const balanceByCard = new Map<string, number>();
 
     for (const t of tx) {
       const type = String((t as any).type || "").toUpperCase();
-      if (type !== "EXPENSE") continue;
-
       const cardIdRaw = (t as any).card_id ?? (t as any).cardId ?? null;
       if (!cardIdRaw) continue;
 
       const cid = toId(cardIdRaw);
       const amt = toNumber((t as any).amount);
+      if (amt <= 0) continue;
 
-      map.set(cid, (map.get(cid) || 0) + amt);
+      const current = balanceByCard.get(cid) || 0;
+      if (type === "EXPENSE") {
+        balanceByCard.set(cid, current + amt);
+        continue;
+      }
+
+      if (type === "INCOME") {
+        balanceByCard.set(cid, current - amt);
+      }
     }
 
-    return map;
+    const normalized = new Map<string, number>();
+    for (const [cid, balance] of balanceByCard.entries()) {
+      normalized.set(cid, Math.max(0, balance));
+    }
+
+    return normalized;
   }, [tx]);
 
   // UI cards: solo credit (credit_limit > 0)

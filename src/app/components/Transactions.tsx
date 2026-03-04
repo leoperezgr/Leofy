@@ -9,7 +9,7 @@ import { useAppDate } from "../contexts/AppDateContext";
 import { LoadingScreen } from "./LoadingScreen";
 import "../../styles/components/Transactions.css";
 
-type FilterType = "all" | "income" | "expense";
+type FilterType = "all" | "income" | "expense" | "credit_payment";
 type InstallmentsInfo = {
   months: number;
   monthlyAmount: number;
@@ -18,13 +18,31 @@ type InstallmentsInfo = {
 };
 
 type UiTransactionRow = UiTransaction & {
+  kind: "transaction";
   cardName?: string;
   cardId?: string;
   categoryIcon?: string;
   installments?: InstallmentsInfo;
 };
+
+type TransferListRow = {
+  kind: "transfer";
+  id: string;
+  transferId: string;
+  amount: number;
+  description: string;
+  category: string;
+  date: string;
+  fromCardId: string;
+  toCardId: string;
+  fromCardName: string;
+  toCardName: string;
+  toCardIsCredit: boolean;
+  section: "all" | "credit_payment";
+};
+
+type ListRow = UiTransactionRow | TransferListRow;
 type ManagedCategory = { id: string; name: string; icon: string; type: "income" | "expense"; aliases?: string[] };
-const CATEGORY_STORAGE_KEY = "leofy_settings_categories_v1";
 
 type PaymentSource = {
   payment_method?: string | null;
@@ -36,8 +54,27 @@ type PaymentSource = {
   metadata?: {
     payment_method?: string | null;
     paymentMethod?: string | null;
+    transferRole?: string | null;
+    fromCardId?: string | number | null;
+    toCardId?: string | number | null;
+    installments?: {
+      months?: number | string;
+      monthlyAmount?: number | string;
+      startAt?: string;
+    } | null;
   } | null;
+  transfer_id?: string | null;
+  transferId?: string | null;
+  type?: string | null;
+  amount?: number | string | null;
+  description?: string | null;
+  occurred_at?: string | null;
+  date?: string | null;
+  created_at?: string | null;
 };
+
+const CATEGORY_STORAGE_KEY = "leofy_settings_categories_v1";
+const TRANSFER_NAMES = new Set(["transfer", "transfers", "transferencia", "transferencias"]);
 
 const getPaymentMethodFromApi = (tx: PaymentSource | null | undefined, fallback = "") => {
   const raw =
@@ -57,6 +94,13 @@ const cardToMethod = (card: PaymentSource | null | undefined) => {
 const toNumber = (value: unknown) => {
   const n = typeof value === "string" ? Number(value) : Number(value ?? 0);
   return Number.isFinite(n) ? n : 0;
+};
+
+const dateToDay = (value: string | null | undefined) => {
+  const source = value || new Date().toISOString();
+  const parsed = new Date(source);
+  if (Number.isNaN(parsed.getTime())) return new Date().toISOString().split("T")[0];
+  return parsed.toISOString().split("T")[0];
 };
 
 const getInstallmentsInfo = (row: any, referenceDate: Date): InstallmentsInfo | null => {
@@ -92,29 +136,57 @@ const getInstallmentsInfo = (row: any, referenceDate: Date): InstallmentsInfo | 
   };
 };
 
-const TRANSFER_NAMES = new Set(['transfer', 'transfers', 'transferencia', 'transferencias']);
+function isTransferRow(row: ListRow): row is TransferListRow {
+  return row.kind === "transfer";
+}
 
-function getIconNameForTx(tx: UiTransactionRow): string {
-  if (tx.categoryIcon) return tx.categoryIcon;
+function getIconNameForRow(row: ListRow): string {
+  if (isTransferRow(row)) return "ArrowLeftRight";
+  if (row.categoryIcon) return row.categoryIcon;
 
-  const cat = String(tx.category || '').trim().toLowerCase();
+  const cat = String(row.category || "").trim().toLowerCase();
 
-  if (TRANSFER_NAMES.has(cat)) return 'ArrowLeftRight';
+  if (TRANSFER_NAMES.has(cat)) return "ArrowLeftRight";
 
-  // Type-aware lookup in mockData categories
-  const typedMatch = mockCategories.find((c) => c.name.toLowerCase() === cat && c.type === tx.type);
+  const typedMatch = mockCategories.find((category) => category.name.toLowerCase() === cat && category.type === row.type);
   if (typedMatch) return typedMatch.icon;
 
-  // Income-specific fallbacks for common names not in mockData
-  if (tx.type === 'income') {
-    if (cat.includes('salary') || cat.includes('wage') || cat.includes('sueldo')) return 'Briefcase';
-    if (cat.includes('freelance') || cat.includes('consulting')) return 'Laptop2';
-    if (cat.includes('bonus')) return 'Gift';
-    if (cat.includes('rent') || cat.includes('renta')) return 'Building2';
-    return 'CircleDollarSign';
+  if (row.type === "income") {
+    if (cat.includes("salary") || cat.includes("wage") || cat.includes("sueldo")) return "Briefcase";
+    if (cat.includes("freelance") || cat.includes("consulting")) return "Laptop2";
+    if (cat.includes("bonus")) return "Gift";
+    if (cat.includes("rent") || cat.includes("renta")) return "Building2";
+    return "CircleDollarSign";
   }
 
-  return getCategoryIcon(tx.category);
+  return getCategoryIcon(row.category);
+}
+
+function getSearchText(row: ListRow) {
+  if (isTransferRow(row)) {
+    return [
+      row.description,
+      row.category,
+      row.fromCardName,
+      row.toCardName,
+      row.toCardIsCredit ? "credit payment" : "",
+    ]
+      .join(" ")
+      .toLowerCase();
+  }
+
+  return [row.description, row.category, row.cardName, row.paymentMethod].join(" ").toLowerCase();
+}
+
+function getSortKey(row: ListRow) {
+  if (isTransferRow(row)) return row.transferId;
+  return row.id;
+}
+
+function getDestinationLabel(row: TransferListRow) {
+  return row.toCardIsCredit
+    ? `Credit Payment to ${row.toCardName} from ${row.fromCardName}`
+    : `From ${row.fromCardName} -> ${row.toCardName}`;
 }
 
 export function Transactions() {
@@ -124,7 +196,7 @@ export function Transactions() {
 
   const [filter, setFilter] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [items, setItems] = useState<UiTransactionRow[]>([]);
+  const [items, setItems] = useState<ListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobileEditTxId, setMobileEditTxId] = useState<string | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -138,11 +210,11 @@ export function Transactions() {
     longPressTimerRef.current = null;
   };
 
-  const handleRowTouchStart = (transactionId: string) => {
+  const handleRowTouchStart = (rowId: string) => {
     if (!isTouchDevice()) return;
     clearLongPress();
     longPressTimerRef.current = setTimeout(() => {
-      setMobileEditTxId(transactionId);
+      setMobileEditTxId(rowId);
       longPressTimerRef.current = null;
     }, LONG_PRESS_MS);
   };
@@ -162,6 +234,7 @@ export function Transactions() {
     async function load() {
       try {
         setLoading(true);
+        const referenceDate = getAppDate();
 
         const headers = {
           ...authHeaders(),
@@ -181,6 +254,11 @@ export function Transactions() {
           throw new Error(msg);
         }
 
+        if (!cardsRes.ok) {
+          const msg = cardsData?.error || cardsData?.message || `Failed to load cards (${cardsRes.status})`;
+          throw new Error(msg);
+        }
+
         const rawList: any[] = Array.isArray(data)
           ? data
           : Array.isArray(data?.transactions)
@@ -194,13 +272,13 @@ export function Transactions() {
           const rawCategories = localStorage.getItem(CATEGORY_STORAGE_KEY);
           const parsedCategories: ManagedCategory[] = rawCategories ? JSON.parse(rawCategories) : [];
           if (Array.isArray(parsedCategories)) {
-            for (const c of parsedCategories) {
-              const currentName = String(c?.name || "").trim();
-              const currentIcon = String(c?.icon || "Circle");
+            for (const category of parsedCategories) {
+              const currentName = String(category?.name || "").trim();
+              const currentIcon = String(category?.icon || "Circle");
               if (!currentName) continue;
               aliasToCurrent.set(currentName.toLowerCase(), { name: currentName, icon: currentIcon });
-              if (Array.isArray(c?.aliases)) {
-                for (const alias of c.aliases) {
+              if (Array.isArray(category?.aliases)) {
+                for (const alias of category.aliases) {
                   const aliasKey = String(alias || "").trim().toLowerCase();
                   if (!aliasKey) continue;
                   aliasToCurrent.set(aliasKey, { name: currentName, icon: currentIcon });
@@ -209,16 +287,20 @@ export function Transactions() {
             }
           }
         } catch {
-          // ignore local category mapping errors
+          // Ignore malformed local category overrides
         }
 
         const cardsList: any[] = Array.isArray(cardsData) ? cardsData : [];
         const cardMethodById = new Map<string, string>();
         const cardNameById = new Map<string, string>();
+        const cardIsCreditById = new Map<string, boolean>();
         for (const card of cardsList) {
           if (!card?.id) continue;
-          cardMethodById.set(String(card.id), cardToMethod(card));
-          if (card?.name) cardNameById.set(String(card.id), String(card.name));
+          const cardId = String(card.id);
+          const isCredit = cardToMethod(card) === "credit";
+          cardMethodById.set(cardId, isCredit ? "credit" : "debit");
+          cardNameById.set(cardId, card?.name ? String(card.name) : `Card ${cardId}`);
+          cardIsCreditById.set(cardId, isCredit);
         }
 
         const paymentById = new Map<string, string>();
@@ -227,26 +309,27 @@ export function Transactions() {
         const installmentsByTxId = new Map<string, InstallmentsInfo>();
         for (const row of rawList) {
           if (!row?.id) continue;
+          const txId = String(row.id);
           const explicit = getPaymentMethodFromApi(row, "");
           const cardId = row?.card_id ?? row?.cardId ?? null;
           const fromCard = cardId != null ? cardMethodById.get(String(cardId)) : null;
           const method = explicit || fromCard || "cash";
-          if (method) paymentById.set(String(row.id), method);
+          if (method) paymentById.set(txId, method);
           if (cardId != null) {
-            cardIdByTxId.set(String(row.id), String(cardId));
+            cardIdByTxId.set(txId, String(cardId));
             const cardName = cardNameById.get(String(cardId));
-            if (cardName) cardNameByTxId.set(String(row.id), cardName);
+            if (cardName) cardNameByTxId.set(txId, cardName);
           }
-          const installmentsInfo = getInstallmentsInfo(row, getAppDate());
-          if (installmentsInfo) {
-            installmentsByTxId.set(String(row.id), installmentsInfo);
-          }
+          const installmentsInfo = getInstallmentsInfo(row, referenceDate);
+          if (installmentsInfo) installmentsByTxId.set(txId, installmentsInfo);
         }
 
-        const normalized: UiTransactionRow[] = normalizeTransactions(data).map((tx) => {
+        const normalizedById = new Map<string, UiTransactionRow>();
+        const normalizedTransactions: UiTransactionRow[] = normalizeTransactions(data).map((tx) => {
           const mapped = aliasToCurrent.get(String(tx.category || "").trim().toLowerCase());
-          return {
+          const row: UiTransactionRow = {
             ...tx,
+            kind: "transaction",
             category: mapped?.name || tx.category,
             categoryIcon: mapped?.icon || undefined,
             paymentMethod: paymentById.get(String(tx.id)) || tx.paymentMethod || "cash",
@@ -254,9 +337,72 @@ export function Transactions() {
             cardId: cardIdByTxId.get(String(tx.id)),
             installments: installmentsByTxId.get(String(tx.id)),
           };
+          normalizedById.set(String(tx.id), row);
+          return row;
         });
 
-        if (!cancelled) setItems(normalized);
+        const transferGroups = new Map<string, any[]>();
+        for (const row of rawList) {
+          const transferId = String(row?.transfer_id ?? row?.transferId ?? "").trim();
+          if (!transferId) continue;
+          const group = transferGroups.get(transferId) || [];
+          group.push(row);
+          transferGroups.set(transferId, group);
+        }
+
+        const consumedIds = new Set<string>();
+        const transferRows: TransferListRow[] = [];
+        for (const [transferId, group] of transferGroups.entries()) {
+          const outgoingRaw =
+            group.find((row) => String(row?.metadata?.transferRole || "").toLowerCase() === "outgoing") ||
+            group.find((row) => String(row?.type || "").toUpperCase() === "EXPENSE") ||
+            null;
+          const incomingRaw =
+            group.find((row) => String(row?.metadata?.transferRole || "").toLowerCase() === "incoming") ||
+            group.find((row) => String(row?.type || "").toUpperCase() === "INCOME") ||
+            null;
+
+          if (!outgoingRaw || !incomingRaw || group.length < 2) continue;
+
+          const outgoingId = String(outgoingRaw.id);
+          const incomingId = String(incomingRaw.id);
+          const outgoing = normalizedById.get(outgoingId);
+          const incoming = normalizedById.get(incomingId);
+          if (!outgoing || !incoming) continue;
+
+          consumedIds.add(outgoingId);
+          consumedIds.add(incomingId);
+
+          const fromCardId =
+            String(outgoingRaw?.metadata?.fromCardId || outgoingRaw?.card_id || outgoing.cardId || "").trim();
+          const toCardId =
+            String(incomingRaw?.metadata?.toCardId || incomingRaw?.card_id || incoming.cardId || "").trim();
+
+          const fromCardName = cardNameById.get(fromCardId) || "Unknown account";
+          const toCardName = cardNameById.get(toCardId) || "Unknown account";
+          const toCardIsCredit = Boolean(cardIsCreditById.get(toCardId));
+
+          transferRows.push({
+            kind: "transfer",
+            id: transferId,
+            transferId,
+            amount: outgoing.amount,
+            description: outgoing.description || incoming.description || "Transfer",
+            category: "Transfer",
+            date: outgoing.date || incoming.date || dateToDay(outgoingRaw?.occurred_at),
+            fromCardId,
+            toCardId,
+            fromCardName,
+            toCardName,
+            toCardIsCredit,
+            section: toCardIsCredit ? "credit_payment" : "all",
+          });
+        }
+
+        const nonTransferRows = normalizedTransactions.filter((row) => !consumedIds.has(String(row.id)));
+        const nextItems: ListRow[] = [...nonTransferRows, ...transferRows];
+
+        if (!cancelled) setItems(nextItems);
       } catch (e) {
         console.error("LOAD TRANSACTIONS ERROR:", e);
         if (!cancelled) setItems([]);
@@ -296,24 +442,32 @@ export function Transactions() {
   }, [mobileEditTxId]);
 
   const filteredTransactions = useMemo(() => {
-    return items
-      .filter((t) => filter === 'all' || t.type === filter)
-      .filter((t) => {
-        const q = searchQuery.toLowerCase().trim();
-        if (!q) return true;
+    const query = searchQuery.toLowerCase().trim();
 
-        return (
-          (t.description || "").toLowerCase().includes(q) ||
-          (t.category || "").toLowerCase().includes(q)
-        );
+    return items
+      .filter((row) => {
+        if (isTransferRow(row)) {
+          if (filter === "all") return true;
+          if (filter === "credit_payment") return row.toCardIsCredit;
+          return false;
+        }
+
+        if (filter === "credit_payment") return false;
+        if (filter === "all") return true;
+        return row.type === filter;
+      })
+      .filter((row) => {
+        if (!query) return true;
+        return getSearchText(row).includes(query);
       })
       .sort((a, b) => {
         const byDay = String(b.date || "").localeCompare(String(a.date || ""));
         if (byDay !== 0) return byDay;
-        const bId = Number(b.id);
-        const aId = Number(a.id);
+
+        const bId = Number(getSortKey(b));
+        const aId = Number(getSortKey(a));
         if (Number.isFinite(bId) && Number.isFinite(aId)) return bId - aId;
-        return String(b.id).localeCompare(String(a.id));
+        return String(getSortKey(b)).localeCompare(String(getSortKey(a)));
       });
   }, [items, filter, searchQuery]);
 
@@ -323,7 +477,7 @@ export function Transactions() {
       if (!groups[date]) groups[date] = [];
       groups[date].push(transaction);
       return groups;
-    }, {} as Record<string, UiTransactionRow[]>);
+    }, {} as Record<string, ListRow[]>);
   }, [filteredTransactions]);
 
   const formatDate = (dateString: string) => {
@@ -344,19 +498,14 @@ export function Transactions() {
   };
 
   if (loading) {
-    return (
-      <LoadingScreen
-        title="Transactions"
-        message="Loading your latest movements..."
-      />
-    );
+    return <LoadingScreen title="Transactions" message="Loading your latest movements..." />;
   }
 
   return (
     <div className="tx-page">
       <div className="tx-header">
         <h1 className="tx-title">Transactions</h1>
-        <p className="tx-subtitle">Track all your income and expenses</p>
+        <p className="tx-subtitle">Track all your income, expenses, and card payments</p>
       </div>
 
       <div className="tx-toolbar">
@@ -390,115 +539,151 @@ export function Transactions() {
           >
             Expenses
           </button>
+          <button
+            onClick={() => setFilter("credit_payment")}
+            className={`tx-filter-btn ${
+              filter === "credit_payment" ? "tx-filter-btn-credit-payment-active" : "tx-filter-btn-inactive"
+            }`}
+          >
+            Credit Payment
+          </button>
         </div>
       </div>
 
       <>
         <div className="tx-groups">
-            {Object.entries(groupedTransactions).map(([date, dayTransactions]) => (
-              <div key={date}>
-                <h3 className="tx-group-date">{formatDate(date)}</h3>
+          {Object.entries(groupedTransactions).map(([date, dayTransactions]) => (
+            <div key={date}>
+              <h3 className="tx-group-date">{formatDate(date)}</h3>
 
-                <div className="tx-day-card">
-                  {dayTransactions.map((transaction, index) => {
-                    let IconComponent = LucideIcons.Circle;
+              <div className="tx-day-card">
+                {dayTransactions.map((transaction, index) => {
+                  let IconComponent = LucideIcons.Circle;
 
-                    try {
-                      IconComponent = getIconComponent(getIconNameForTx(transaction));
-                    } catch {
-                      IconComponent = LucideIcons.Circle;
-                    }
+                  try {
+                    IconComponent = getIconComponent(getIconNameForRow(transaction));
+                  } catch {
+                    IconComponent = LucideIcons.Circle;
+                  }
 
-                    return (
-                      <div
-                        key={transaction.id}
-                        className={`group tx-row ${mobileEditTxId === transaction.id ? "tx-row-selected" : ""} ${
-                          index !== dayTransactions.length - 1 ? "tx-row-divider" : ""
-                        }`}
-                        onTouchStart={() => handleRowTouchStart(transaction.id)}
-                        onTouchEnd={handleRowTouchEnd}
-                        onTouchCancel={handleRowTouchEnd}
-                        onTouchMove={handleRowTouchEnd}
-                      >
-                        <div className="tx-row-left">
-                          <div
-                            className={`tx-icon-wrap ${transaction.type === "income" ? "tx-icon-wrap-income" : "tx-icon-wrap-expense"}`}
-                          >
-                            <IconComponent
-                              className={`tx-icon ${transaction.type === "income" ? "tx-icon-income" : "tx-icon-expense"}`}
-                            />
-                          </div>
+                  const rowId = isTransferRow(transaction) ? transaction.transferId : transaction.id;
+                  const rowLink = isTransferRow(transaction)
+                    ? `/transactions/transfers/${transaction.transferId}`
+                    : `/transactions/${transaction.id}`;
 
-                          <div className="tx-main">
-                            <p className="tx-description">{transaction.description || "-"}</p>
-                            <div className="tx-meta-row">
-                              <span className="tx-meta-text">{transaction.category}</span>
-                              <span className="tx-dot">|</span>
-                              <span className="tx-meta-text tx-meta-capitalize">
-                                {transaction.paymentMethod === "cash"
-                                  ? "Cash"
-                                  : transaction.cardName || transaction.paymentMethod}
-                              </span>
-                            </div>
-                            {transaction.installments && (
-                              <div className="tx-installment-row">
-                                <span className="tx-installment-chip">Installments</span>
-                                <span className="tx-installment-info">
-                                  {transaction.installments.currentMonth}/{transaction.installments.months}
-                                  {" \u2022 "}
-                                  ${formatMoney(transaction.installments.monthlyAmount)}/mo
-                                  {" \u2022 "}
-                                  {transaction.installments.remainingMonths > 0
-                                    ? `${transaction.installments.remainingMonths} left`
-                                    : "Completed"}
-                                </span>
-                              </div>
-                            )}
-                          </div>
+                  return (
+                    <div
+                      key={rowId}
+                      className={`group tx-row ${mobileEditTxId === rowId ? "tx-row-selected" : ""} ${
+                        index !== dayTransactions.length - 1 ? "tx-row-divider" : ""
+                      }`}
+                      onTouchStart={() => handleRowTouchStart(rowId)}
+                      onTouchEnd={handleRowTouchEnd}
+                      onTouchCancel={handleRowTouchEnd}
+                      onTouchMove={handleRowTouchEnd}
+                    >
+                      <div className="tx-row-left">
+                        <div
+                          className={`tx-icon-wrap ${
+                            !isTransferRow(transaction) && transaction.type === "income"
+                              ? "tx-icon-wrap-income"
+                              : "tx-icon-wrap-expense"
+                          }`}
+                        >
+                          <IconComponent
+                            className={`tx-icon ${
+                              !isTransferRow(transaction) && transaction.type === "income"
+                                ? "tx-icon-income"
+                                : "tx-icon-expense"
+                            }`}
+                          />
                         </div>
 
-                        <div className="tx-right">
-                          <p
-                            className={`tx-amount ${transaction.type === "income" ? "tx-amount-income" : "tx-amount-expense"}`}
-                          >
-                            {transaction.type === "income" ? "+" : "-"}${formatMoney(transaction.amount)}
-                          </p>
-                          <Link
-                            to={`/transactions/${transaction.id}`}
-                            state={{
-                              paymentMethod: transaction.paymentMethod,
-                              cardId: transaction.cardId ?? null,
-                            }}
-                            className="tx-edit-link-desktop"
-                            aria-label="Edit transaction"
-                            title="Edit transaction"
-                          >
-                            <Pencil className="tx-edit-icon" />
-                          </Link>
-                          {mobileEditTxId === transaction.id && (
-                            <div className="tx-mobile-actions">
-                              <Link
-                                to={`/transactions/${transaction.id}`}
-                                state={{
-                                  paymentMethod: transaction.paymentMethod,
-                                  cardId: transaction.cardId ?? null,
-                                }}
-                                className="tx-mobile-edit-grid"
-                                aria-label="Edit transaction"
-                                title="Edit transaction"
-                              >
-                                <LayoutGrid className="tx-mobile-grid-icon" />
-                                <span>Edit</span>
-                              </Link>
+                        <div className="tx-main">
+                          <p className="tx-description">{transaction.description || "-"}</p>
+                          <div className="tx-meta-row">
+                            <span className="tx-meta-text">{transaction.category}</span>
+                            <span className="tx-dot">|</span>
+                            <span className={`tx-meta-text ${isTransferRow(transaction) ? "" : "tx-meta-capitalize"}`}>
+                              {isTransferRow(transaction)
+                                ? getDestinationLabel(transaction)
+                                : transaction.paymentMethod === "cash"
+                                  ? "Cash"
+                                  : transaction.cardName || transaction.paymentMethod}
+                            </span>
+                          </div>
+                          {!isTransferRow(transaction) && transaction.installments && (
+                            <div className="tx-installment-row">
+                              <span className="tx-installment-chip">Installments</span>
+                              <span className="tx-installment-info">
+                                {transaction.installments.currentMonth}/{transaction.installments.months}
+                                {" \u2022 "}
+                                ${formatMoney(transaction.installments.monthlyAmount)}/mo
+                                {" \u2022 "}
+                                {transaction.installments.remainingMonths > 0
+                                  ? `${transaction.installments.remainingMonths} left`
+                                  : "Completed"}
+                              </span>
                             </div>
                           )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+
+                      <div className="tx-right">
+                        <p
+                          className={`tx-amount ${
+                            !isTransferRow(transaction) && transaction.type === "income"
+                              ? "tx-amount-income"
+                              : "tx-amount-expense"
+                          }`}
+                        >
+                          {isTransferRow(transaction) ? "$" : transaction.type === "income" ? "+$" : "-$"}
+                          {formatMoney(transaction.amount)}
+                        </p>
+                        <Link
+                          to={rowLink}
+                          state={
+                            isTransferRow(transaction)
+                              ? undefined
+                              : {
+                                  paymentMethod: transaction.paymentMethod,
+                                  cardId: transaction.cardId ?? null,
+                                }
+                          }
+                          className="tx-edit-link-desktop"
+                          aria-label="Edit transaction"
+                          title="Edit transaction"
+                        >
+                          <Pencil className="tx-edit-icon" />
+                        </Link>
+                        {mobileEditTxId === rowId && (
+                          <div className="tx-mobile-actions">
+                            <Link
+                              to={rowLink}
+                              state={
+                                isTransferRow(transaction)
+                                  ? undefined
+                                  : {
+                                      paymentMethod: transaction.paymentMethod,
+                                      cardId: transaction.cardId ?? null,
+                                    }
+                              }
+                              className="tx-mobile-edit-grid"
+                              aria-label="Edit transaction"
+                              title="Edit transaction"
+                            >
+                              <LayoutGrid className="tx-mobile-grid-icon" />
+                              <span>Edit</span>
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            </div>
+          ))}
         </div>
 
         {filteredTransactions.length === 0 && (

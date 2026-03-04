@@ -201,6 +201,7 @@ export function CardDetail() {
 
         return {
           id: toId(t.id),
+          type: String((t as any).type || "").toUpperCase() === "INCOME" ? "income" : "expense",
           amount: toNumber(t.amount),
           description: t.description ?? "—",
           category: categoryResolved,
@@ -416,7 +417,7 @@ export function CardDetail() {
                     </div>
                     <div className="cd-transaction-right">
                       <p className="cd-transaction-amount">
-                        -${formatMoney(transaction.amount)}
+                        {transaction.type === "income" ? "+" : "-"}${formatMoney(transaction.amount)}
                       </p>
                       <p className="cd-transaction-date">
                         {new Date(transaction.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
@@ -435,4 +436,3 @@ export function CardDetail() {
     </div>
   );
 }
-

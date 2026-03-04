@@ -372,6 +372,7 @@ export function CreditCardDetail() {
 
         return {
           id: toId(t.id),
+          type: String((t as any).type || "").toUpperCase() === "INCOME" ? "income" : "expense",
           amount: toNumber(t.amount),
           description: t.description ?? "—",
           category: categoryResolved,
@@ -383,14 +384,18 @@ export function CreditCardDetail() {
   }, [tx, cardId, categoryById, categoryByName, getAppDate]);
 
   const usedAmount = useMemo(() => {
-    // sum de EXPENSE de esa tarjeta
-    return tx.reduce((sum, t) => {
+    // saldo usado neto: EXPENSE suma, INCOME resta
+    const netUsed = tx.reduce((sum, t) => {
       const type = String((t as any).type || "").toUpperCase();
-      const cid = (t as any).card_id ?? null;
+      const cid = (t as any).card_id ?? (t as any).cardId ?? null;
       if (!cid || toId(cid) !== String(cardId)) return sum;
+      const amount = toNumber((t as any).amount);
+      if (amount <= 0) return sum;
+      if (type === "INCOME") return sum - amount;
       if (type !== "EXPENSE") return sum;
-      return sum + toNumber((t as any).amount);
+      return sum + amount;
     }, 0);
+    return Math.max(0, netUsed);
   }, [tx, cardId]);
 
   const usagePercent = creditLimit > 0 ? (usedAmount / creditLimit) * 100 : 0;
@@ -457,7 +462,7 @@ export function CreditCardDetail() {
       const iso = date.toISOString().split("T")[0];
 
       const daySpending = cardTransactions
-        .filter((t) => new Date(t.date).toISOString().split("T")[0] === iso)
+        .filter((t) => t.type === "expense" && new Date(t.date).toISOString().split("T")[0] === iso)
         .reduce((sum, t) => sum + t.amount, 0);
 
       return { date: date.getDate(), amount: daySpending };
@@ -715,10 +720,10 @@ export function CreditCardDetail() {
                            </div>
                          )}
                        </div>
-                     </div>
+                    </div>
                     <div className="cd-transaction-right">
                       <p className="cd-transaction-amount">
-                        -${formatMoney(transaction.amount)}
+                        {transaction.type === "income" ? "+" : "-"}${formatMoney(transaction.amount)}
                       </p>
                       <p className="cd-transaction-date">
                         {new Date(transaction.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}

@@ -58,6 +58,7 @@
 
 .tx-filter-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
@@ -87,6 +88,11 @@
 
 .tx-filter-btn-expense-active {
   background: #ef4444;
+  color: #fff;
+}
+
+.tx-filter-btn-credit-payment-active {
+  background: #2563eb;
   color: #fff;
 }
 
