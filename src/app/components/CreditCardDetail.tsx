@@ -38,7 +38,7 @@ type ApiTx = {
   amount: number | string;
   description: string | null;
   occurred_at: string;
-  category?: string | { name?: string | null } | null;
+  category?: string | { name?: string | null; icon?: string | null } | null;
   category_name?: string | null; // por si backend manda nombre
   category_id?: string | number | null;
   categoryId?: string | number | null;
@@ -61,6 +61,48 @@ function toId(v: string | number) {
 function toNumber(v: any) {
   const n = typeof v === "string" ? Number(v) : Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeCategoryKey(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeIconName(value?: string | null) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if ((LucideIcons as any)[raw]) return raw;
+
+  const pascalCase = raw
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join("");
+
+  return (LucideIcons as any)[pascalCase] ? pascalCase : "";
+}
+
+function getCategoryIconName(categoryName: string) {
+  const normalized = normalizeCategoryKey(categoryName);
+
+  if (normalized.includes("grocery")) return "ShoppingCart";
+  if (
+    normalized.includes("dining") ||
+    normalized.includes("food") ||
+    normalized.includes("restaurant")
+  ) return "Utensils";
+  if (normalized.includes("coffee")) return "Coffee";
+  if (
+    normalized.includes("transport") ||
+    normalized.includes("gas") ||
+    normalized.includes("car")
+  ) return "Car";
+  if (normalized.includes("shop")) return "ShoppingBag";
+  if (normalized.includes("bill") || normalized.includes("subscription")) return "Receipt";
+  if (normalized.includes("health") || normalized.includes("personal")) return "Heart";
+
+  const iconFromMock = normalizeIconName(getCategoryIcon(categoryName));
+  return iconFromMock || "Tag";
 }
 
 function startOfDay(d: Date) {
@@ -278,6 +320,10 @@ export function CreditCardDetail() {
     () => new Map(categories.map((c) => [toId(c.id), c])),
     [categories]
   );
+  const categoryByName = useMemo(
+    () => new Map(categories.map((c) => [normalizeCategoryKey(c.name), c])),
+    [categories]
+  );
 
   const cardTransactions = useMemo(() => {
     if (!cardId) return [];
@@ -295,6 +341,10 @@ export function CreditCardDetail() {
           rawCategory && typeof rawCategory === "object" && typeof (rawCategory as any).name === "string"
             ? String((rawCategory as any).name).trim()
             : "";
+        const iconFromObject =
+          rawCategory && typeof rawCategory === "object" && typeof (rawCategory as any).icon === "string"
+            ? String((rawCategory as any).icon).trim()
+            : "";
         const categoryFromString = typeof rawCategory === "string" ? rawCategory.trim() : "";
         const categoryFromField =
           typeof (t as any).category_name === "string" ? String((t as any).category_name).trim() : "";
@@ -304,27 +354,33 @@ export function CreditCardDetail() {
             : typeof (t as any)?.metadata?.categoryName === "string"
               ? String((t as any).metadata.categoryName).trim()
               : "";
+        const categoryLabelCandidate =
+          categoryFromObject || categoryFromString || categoryFromField || categoryFromMetadata;
+        const categoryFromName = categoryByName.get(normalizeCategoryKey(categoryLabelCandidate));
         const categoryResolved =
-          categoryFromObject ||
-          categoryFromString ||
-          categoryFromField ||
-          categoryFromMetadata ||
+          categoryLabelCandidate ||
           (categoryFromMap?.name
             ? String(categoryFromMap.name)
             : categoryIdRaw !== null && categoryIdRaw !== undefined
               ? "Category"
               : "Uncategorized");
+        const iconResolved =
+          normalizeIconName(iconFromObject) ||
+          normalizeIconName(categoryFromMap?.icon) ||
+          normalizeIconName(categoryFromName?.icon) ||
+          getCategoryIconName(categoryResolved);
 
         return {
           id: toId(t.id),
           amount: toNumber(t.amount),
           description: t.description ?? "—",
           category: categoryResolved,
+          icon: iconResolved,
           date: t.occurred_at,
           installments: getInstallmentsInfo(t, getAppDate()),
         };
       });
-  }, [tx, cardId, categoryById, getAppDate]);
+  }, [tx, cardId, categoryById, categoryByName, getAppDate]);
 
   const usedAmount = useMemo(() => {
     // sum de EXPENSE de esa tarjeta
@@ -411,8 +467,8 @@ export function CreditCardDetail() {
   }, [cardTransactions, getAppDate]);
 
   const getIconComponent = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Circle;
+    const Icon = (LucideIcons as any)[normalizeIconName(iconName)];
+    return Icon || LucideIcons.Tag;
   };
 
   if (loading) {
@@ -629,7 +685,7 @@ export function CreditCardDetail() {
             {cardTransactions
               .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
               .map((transaction, index) => {
-                const IconComponent = getIconComponent(getCategoryIcon(transaction.category));
+                const IconComponent = getIconComponent(transaction.icon);
                 return (
                   <div
                     key={transaction.id}
