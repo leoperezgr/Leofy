@@ -7,6 +7,7 @@ import * as LucideIcons from "lucide-react";
 import { formatMoney } from "../utils/formatMoney";
 import { useAppDate } from "../contexts/AppDateContext";
 import { LoadingScreen } from "./LoadingScreen";
+import { DEFAULT_EXPENSE_CATEGORIES, getCategoryIconName } from "./SettingsCategories";
 import "../../styles/components/Transactions.css";
 
 type FilterType = "all" | "income" | "expense" | "credit_payment";
@@ -156,8 +157,21 @@ function getIconNameForRow(row: ListRow): string {
     if (cat.includes("freelance") || cat.includes("consulting")) return "Laptop2";
     if (cat.includes("bonus")) return "Gift";
     if (cat.includes("rent") || cat.includes("renta")) return "Building2";
+    if (cat.includes("investment") || cat.includes("dividend")) return "TrendingUp";
+    if (cat.includes("allowance") || cat.includes("mesada")) return "Wallet";
+    if (cat.includes("pending")) return "Clock";
     return "CircleDollarSign";
   }
+
+  // Use DEFAULT_EXPENSE_CATEGORIES for exact match first
+  const defaultMatch = DEFAULT_EXPENSE_CATEGORIES.find(
+    (c) => c.name.toLowerCase() === cat
+  );
+  if (defaultMatch) return defaultMatch.icon;
+
+  // Use getCategoryIconName (keyword-based) from SettingsCategories
+  const settingsIcon = getCategoryIconName(row.category);
+  if (settingsIcon !== "Tag") return settingsIcon;
 
   return getCategoryIcon(row.category);
 }
@@ -307,6 +321,7 @@ export function Transactions() {
         const cardNameByTxId = new Map<string, string>();
         const cardIdByTxId = new Map<string, string>();
         const installmentsByTxId = new Map<string, InstallmentsInfo>();
+        const metaIconByTxId = new Map<string, string>();
         for (const row of rawList) {
           if (!row?.id) continue;
           const txId = String(row.id);
@@ -322,6 +337,8 @@ export function Transactions() {
           }
           const installmentsInfo = getInstallmentsInfo(row, referenceDate);
           if (installmentsInfo) installmentsByTxId.set(txId, installmentsInfo);
+          const metaIcon = row?.metadata?.category?.icon;
+          if (metaIcon && typeof metaIcon === "string") metaIconByTxId.set(txId, metaIcon);
         }
 
         const normalizedById = new Map<string, UiTransactionRow>();
@@ -331,7 +348,7 @@ export function Transactions() {
             ...tx,
             kind: "transaction",
             category: mapped?.name || tx.category,
-            categoryIcon: mapped?.icon || undefined,
+            categoryIcon: mapped?.icon || metaIconByTxId.get(String(tx.id)) || undefined,
             paymentMethod: paymentById.get(String(tx.id)) || tx.paymentMethod || "cash",
             cardName: cardNameByTxId.get(String(tx.id)),
             cardId: cardIdByTxId.get(String(tx.id)),
@@ -481,7 +498,8 @@ export function Transactions() {
   }, [filteredTransactions]);
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    const [y, m, d] = dateString.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
     const today = getAppDate();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);

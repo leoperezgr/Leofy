@@ -69,7 +69,7 @@ function formatIconLabel(iconName: string) {
   return iconName.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
 }
 
-const DEFAULT_EXPENSE_CATEGORIES: Array<Pick<ManagedCategory, "name" | "icon" | "type">> = [
+export const DEFAULT_EXPENSE_CATEGORIES: Array<Pick<ManagedCategory, "name" | "icon" | "type">> = [
   { name: "Groceries", icon: "ShoppingCart", type: "expense" },
   { name: "Dining", icon: "Utensils", type: "expense" },
   { name: "Coffee", icon: "Coffee", type: "expense" },
@@ -79,7 +79,7 @@ const DEFAULT_EXPENSE_CATEGORIES: Array<Pick<ManagedCategory, "name" | "icon" | 
   { name: "Health & Personal", icon: "Heart", type: "expense" },
 ];
 
-function getCategoryIconName(name: string) {
+export function getCategoryIconName(name: string) {
   const normalized = String(name || "").trim().toLowerCase();
 
   if (normalized.includes("grocery")) return "ShoppingCart";
