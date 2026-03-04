@@ -5,6 +5,7 @@ import { getCategoryIcon, categories as mockCategories } from "../utils/mockData
 import { UiTransaction, normalizeTransactions } from "../utils/transactionsMapper";
 import * as LucideIcons from "lucide-react";
 import { formatMoney } from "../utils/formatMoney";
+import { useAppDate } from "../contexts/AppDateContext";
 import { LoadingScreen } from "./LoadingScreen";
 import "../../styles/components/Transactions.css";
 
@@ -58,7 +59,7 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-const getInstallmentsInfo = (row: any): InstallmentsInfo | null => {
+const getInstallmentsInfo = (row: any, referenceDate: Date): InstallmentsInfo | null => {
   const installments = row?.metadata?.installments;
   if (!installments || typeof installments !== "object") return null;
 
@@ -74,7 +75,7 @@ const getInstallmentsInfo = (row: any): InstallmentsInfo | null => {
 
   const startRaw = (installments as any).startAt || row?.occurred_at || row?.date || row?.created_at;
   const startAt = startRaw ? new Date(startRaw) : null;
-  const now = new Date();
+  const now = referenceDate;
 
   let currentMonth = 1;
   if (startAt && !Number.isNaN(startAt.getTime())) {
@@ -117,6 +118,7 @@ function getIconNameForTx(tx: UiTransactionRow): string {
 }
 
 export function Transactions() {
+  const { getAppDate } = useAppDate();
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
   const LONG_PRESS_MS = 450;
 
@@ -235,7 +237,7 @@ export function Transactions() {
             const cardName = cardNameById.get(String(cardId));
             if (cardName) cardNameByTxId.set(String(row.id), cardName);
           }
-          const installmentsInfo = getInstallmentsInfo(row);
+          const installmentsInfo = getInstallmentsInfo(row, getAppDate());
           if (installmentsInfo) {
             installmentsByTxId.set(String(row.id), installmentsInfo);
           }
@@ -326,7 +328,7 @@ export function Transactions() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    const today = new Date();
+    const today = getAppDate();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 

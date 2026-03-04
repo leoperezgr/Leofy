@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "rec
 import * as LucideIcons from "lucide-react";
 import { formatMoney } from "../utils/formatMoney";
 import { getCategoryIcon } from "../utils/mockData"; // si ya tienes un mapper real, lo cambiamos luego
+import { useAppDate } from "../contexts/AppDateContext";
 import { LoadingScreen } from "./LoadingScreen";
 import "../../styles/components/CardDetail.css";
 
@@ -132,7 +133,7 @@ function computeAmountDueForRange(transactions: ApiTx[], currentCardId: string, 
   return Math.max(0, due);
 }
 
-function getInstallmentsInfo(row: ApiTx): InstallmentsInfo | null {
+function getInstallmentsInfo(row: ApiTx, referenceDate: Date): InstallmentsInfo | null {
   const installments = row?.metadata?.installments;
   if (!installments || typeof installments !== "object") return null;
 
@@ -148,7 +149,7 @@ function getInstallmentsInfo(row: ApiTx): InstallmentsInfo | null {
 
   const startRaw = (installments as any).startAt || row?.occurred_at;
   const startAt = startRaw ? new Date(startRaw) : null;
-  const now = new Date();
+  const now = referenceDate;
 
   let currentMonth = 1;
   if (startAt && !Number.isNaN(startAt.getTime())) {
@@ -191,6 +192,7 @@ function colorToGradient(color?: string | null) {
 }
 
 export function CreditCardDetail() {
+  const { getAppDate } = useAppDate();
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
   const { cardId } = useParams<{ cardId: string }>();
 
@@ -319,10 +321,10 @@ export function CreditCardDetail() {
           description: t.description ?? "—",
           category: categoryResolved,
           date: t.occurred_at,
-          installments: getInstallmentsInfo(t),
+          installments: getInstallmentsInfo(t, getAppDate()),
         };
       });
-  }, [tx, cardId, categoryById]);
+  }, [tx, cardId, categoryById, getAppDate]);
 
   const usedAmount = useMemo(() => {
     // sum de EXPENSE de esa tarjeta
@@ -338,7 +340,7 @@ export function CreditCardDetail() {
   const usagePercent = creditLimit > 0 ? (usedAmount / creditLimit) * 100 : 0;
   const isHighUsage = usagePercent > 80;
 
-  const today = useMemo(() => startOfDay(new Date()), []);
+  const today = useMemo(() => startOfDay(getAppDate()), [getAppDate]);
   const nextClosingDate = useMemo(() => {
     if (!isCredit || closingDay <= 0) return null;
     const candidate = safeDayInMonth(today.getFullYear(), today.getMonth(), closingDay);
@@ -346,14 +348,25 @@ export function CreditCardDetail() {
     const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
     return safeDayInMonth(nextMonth.getFullYear(), nextMonth.getMonth(), closingDay);
   }, [isCredit, closingDay, today]);
+  const lastClosingDate = useMemo(() => {
+    if (!isCredit || closingDay <= 0) return null;
+    const candidate = safeDayInMonth(today.getFullYear(), today.getMonth(), closingDay);
+    if (today.getTime() >= candidate.getTime()) return candidate;
+    const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    return safeDayInMonth(previousMonth.getFullYear(), previousMonth.getMonth(), closingDay);
+  }, [isCredit, closingDay, today]);
+  const paymentDueDate = useMemo(() => {
+    if (!isCredit || dueDay <= 0 || !lastClosingDate) return null;
+    return safeDayInMonth(lastClosingDate.getFullYear(), lastClosingDate.getMonth() + 1, dueDay);
+  }, [isCredit, dueDay, lastClosingDate]);
 
-  const nextDueDate = useMemo(() => {
-    if (!isCredit || dueDay <= 0 || !nextClosingDate) return null;
-    const candidate = safeDayInMonth(nextClosingDate.getFullYear(), nextClosingDate.getMonth(), dueDay);
-    if (candidate.getTime() > nextClosingDate.getTime()) return candidate;
-    const nextMonth = new Date(nextClosingDate.getFullYear(), nextClosingDate.getMonth() + 1, 1);
-    return safeDayInMonth(nextMonth.getFullYear(), nextMonth.getMonth(), dueDay);
-  }, [isCredit, dueDay, nextClosingDate]);
+  const pastCycleEnd = useMemo(() => (lastClosingDate ? startOfDay(lastClosingDate) : null), [lastClosingDate]);
+  const pastCycleStart = useMemo(() => {
+    if (!pastCycleEnd) return null;
+    const prevClosing = addMonths(pastCycleEnd, -1);
+    const nextDay = new Date(prevClosing.getFullYear(), prevClosing.getMonth(), prevClosing.getDate() + 1);
+    return startOfDay(nextDay);
+  }, [pastCycleEnd]);
 
   const cycleEnd = useMemo(() => (nextClosingDate ? startOfDay(nextClosingDate) : null), [nextClosingDate]);
   const cycleStart = useMemo(() => {
@@ -372,6 +385,10 @@ export function CreditCardDetail() {
     if (!cardId || !isCredit || !cycleStart || !cycleEnd) return 0;
     return computeAmountDueForRange(tx, String(cardId), cycleStart, cycleEnd);
   }, [tx, cardId, isCredit, cycleStart, cycleEnd]);
+  const amountPastCycle = useMemo(() => {
+    if (!cardId || !isCredit || !pastCycleStart || !pastCycleEnd) return 0;
+    return computeAmountDueForRange(tx, String(cardId), pastCycleStart, pastCycleEnd);
+  }, [tx, cardId, isCredit, pastCycleStart, pastCycleEnd]);
   const amountDueNextCycle = useMemo(() => {
     if (!cardId || !isCredit || !nextCycleStart || !nextCycleEnd) return 0;
     return computeAmountDueForRange(tx, String(cardId), nextCycleStart, nextCycleEnd);
@@ -379,7 +396,7 @@ export function CreditCardDetail() {
 
   const last30Days = useMemo(() => {
     const days = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date();
+      const date = new Date(getAppDate());
       date.setDate(date.getDate() - (29 - i));
       const iso = date.toISOString().split("T")[0];
 
@@ -391,7 +408,7 @@ export function CreditCardDetail() {
     });
 
     return days;
-  }, [cardTransactions]);
+  }, [cardTransactions, getAppDate]);
 
   const getIconComponent = (iconName: string) => {
     const Icon = (LucideIcons as any)[iconName];
@@ -488,25 +505,30 @@ export function CreditCardDetail() {
         <div className="cd-box cd-box-spacing">
           <div className="cd-stats-grid cd-cycle-stats-grid">
             <div className="cd-cycle-stat">
-              <p className="cd-label">Closing date</p>
-              <p className="cd-stat-value">Every {closingDay || "--"}</p>
+              <p className="cd-label">Closing & Payment</p>
+              <p className="cd-stat-value">Close {closingDay || "--"} / Pay {dueDay || "--"}</p>
               <p className="cd-subtitle">
                 {nextClosingDate
-                  ? nextClosingDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                  : "Not set"}
+                  ? `Next close: ${nextClosingDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                  : "Closing date not set"}
               </p>
             </div>
             <div className="cd-cycle-stat">
-              <p className="cd-label">Payment due</p>
-              <p className="cd-stat-value">Every {dueDay || "--"}</p>
+              <p className="cd-label">Amount past cycle</p>
+              <p className="cd-stat-value">${formatMoney(amountPastCycle)}</p>
               <p className="cd-subtitle">
-                {nextDueDate
-                  ? nextDueDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                  : "Not set"}
+                {pastCycleStart && pastCycleEnd
+                  ? `${pastCycleStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${pastCycleEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                  : "Last statement"}
+              </p>
+              <p className="cd-subtitle">
+                {paymentDueDate
+                  ? `Pay before ${paymentDueDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                  : "Pay before due date"}
               </p>
             </div>
             <div className="cd-cycle-stat">
-              <p className="cd-label">Amount due this cycle</p>
+              <p className="cd-label">Current cycle projected</p>
               <p className="cd-stat-value">${formatMoney(amountDueCycle)}</p>
               <p className="cd-subtitle">
                 {cycleStart && cycleEnd
@@ -515,7 +537,7 @@ export function CreditCardDetail() {
               </p>
             </div>
             <div className="cd-cycle-stat">
-              <p className="cd-label">Projected due next cycle</p>
+              <p className="cd-label">Projected next cycle</p>
               <p className="cd-stat-value">${formatMoney(amountDueNextCycle)}</p>
               <p className="cd-subtitle">
                 {nextCycleStart && nextCycleEnd
@@ -670,5 +692,3 @@ export function CreditCardDetail() {
     </div>
   );
 }
-
-

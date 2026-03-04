@@ -229,3 +229,23 @@ transactionsRouter.put("/:transactionId", async (req, res) => {
 
   return res.json(updated);
 });
+
+transactionsRouter.delete("/:transactionId", async (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const parsedId = idSchema.safeParse(req.params);
+  if (!parsedId.success) return res.status(400).json({ error: "Invalid transactionId" });
+
+  const txId = BigInt(parsedId.data.transactionId);
+  const existing = await prisma.transaction.findFirst({
+    where: { id: txId, user_id: userId },
+  });
+  if (!existing) return res.status(404).json({ error: "Transaction not found" });
+
+  await prisma.transaction.delete({
+    where: { id: txId },
+  });
+
+  return res.status(204).send();
+});

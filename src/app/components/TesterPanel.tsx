@@ -44,13 +44,13 @@ export function TesterPanel() {
   // Cycle tester
   const [cycleClosingDay, setCycleClosingDay] = useState(15);
   const [cycleDueDay, setCycleDueDay] = useState(5);
-  const [cycleSimDate, setCycleSimDate] = useState(() => toInputDate(new Date()));
+  const [cycleSimDate, setCycleSimDate] = useState(() => toInputDate(getAppDate()));
   const [cycleResult, setCycleResult] = useState<CycleResult | null>(null);
   const [cycleLoading, setCycleLoading] = useState(false);
 
   // Stats tester
   const [statsPeriod, setStatsPeriod] = useState('month');
-  const [statsSimDate, setStatsSimDate] = useState(() => toInputDate(new Date()));
+  const [statsSimDate, setStatsSimDate] = useState(() => toInputDate(getAppDate()));
   const [statsResult, setStatsResult] = useState<StatsResult | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
