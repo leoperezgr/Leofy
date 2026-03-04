@@ -274,6 +274,41 @@ export function sumAmounts(rows: ApiTx[]) {
   return rows.reduce((sum, row) => sum + toNumber(row.amount), 0);
 }
 
+export function computeNetUsedByCard(
+  transactions: ApiTx[],
+  allowedCardIds?: Set<string>
+) {
+  const balanceByCard = new Map<string, number>();
+
+  for (const tx of transactions) {
+    const cardId = getTransactionCardId(tx);
+    if (!cardId) continue;
+    if (allowedCardIds && !allowedCardIds.has(cardId)) continue;
+
+    const amount = toNumber(tx.amount);
+    if (amount <= 0) continue;
+
+    const txType = String(tx.type || '').toUpperCase();
+    const current = balanceByCard.get(cardId) ?? 0;
+
+    if (txType === 'EXPENSE') {
+      balanceByCard.set(cardId, current + amount);
+      continue;
+    }
+
+    if (txType === 'INCOME') {
+      balanceByCard.set(cardId, current - amount);
+    }
+  }
+
+  const normalized = new Map<string, number>();
+  for (const [cardId, balance] of balanceByCard.entries()) {
+    normalized.set(cardId, Math.max(0, balance));
+  }
+
+  return normalized;
+}
+
 export function getTransactionCategoryName(tx: ApiTx) {
   const direct = typeof tx.category === 'string' ? tx.category.trim() : '';
   if (direct) return direct;

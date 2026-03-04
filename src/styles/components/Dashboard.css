@@ -239,6 +239,18 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
+.dashboard-hero-safe {
+  background: linear-gradient(135deg, #059669, #10B981);
+}
+
+.dashboard-hero-safe-negative {
+  background: linear-gradient(135deg, #DC2626, #EF4444);
+}
+
+.dashboard-hero-credit {
+  background: linear-gradient(135deg, #1E3A8A, #3B82F6);
+}
+
 @media (max-width: 768px) {
   .dashboard-page::before {
     height: 13rem;

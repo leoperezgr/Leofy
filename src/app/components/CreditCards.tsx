@@ -3,18 +3,16 @@ import { ArrowRight, AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { formatMoney } from "../utils/formatMoney";
 import { LoadingScreen } from "./LoadingScreen";
+import { applyCardOrder } from "../utils/cardOrder";
+import {
+  type ApiCard,
+  type ApiTx,
+  toId,
+  toNumber,
+  cardColorToGradient,
+  computeNetUsedByCard,
+} from "../utils/creditCycleCalculator";
 import "../../styles/components/CreditCards.css";
-
-type ApiCard = {
-  id: string | number;
-  name: string;
-  last4: string | null;
-  brand: "VISA" | "MASTERCARD" | "AMEX" | "OTHER" | null;
-  credit_limit: number | string | null;
-  closing_day?: number | null;
-  due_day?: number | null;
-  color?: string | null; // enum en backend, lo tratamos como string aquí
-};
 
 type UiCard = {
   id: string;
@@ -25,49 +23,6 @@ type UiCard = {
   colorClass: string; // tailwind gradient class
 };
 
-type ApiTx = {
-  id: string | number;
-  type: "INCOME" | "EXPENSE" | "income" | "expense";
-  amount: number | string;
-  occurred_at?: string;
-  card_id?: string | number | null;
-  cardId?: string | number | null; // por si tu normalizador lo usa
-};
-
-function toId(v: string | number) {
-  return typeof v === "number" ? String(v) : String(v);
-}
-
-function toNumber(v: any) {
-  const n = typeof v === "string" ? Number(v) : Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function colorToGradient(color?: string | null) {
-  switch ((color || "OTHER").toUpperCase()) {
-    case "RED":
-      return "from-red-500 to-rose-600";
-    case "ORANGE":
-      return "from-orange-500 to-amber-600";
-    case "BLUE":
-      return "from-blue-500 to-sky-600";
-    case "GOLD":
-      return "from-yellow-500 to-amber-600";
-    case "BLACK":
-      return "from-zinc-900 to-zinc-700";
-    case "PLATINUM":
-      return "from-slate-500 to-slate-700";
-    case "SILVER":
-      return "from-gray-400 to-gray-600";
-    case "PURPLE":
-      return "from-purple-500 to-fuchsia-600";
-    case "GREEN":
-      return "from-emerald-500 to-teal-600";
-    default:
-      return "from-[#2DD4BF] to-[#14B8A6]";
-  }
-}
-
 export function CreditCards() {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
@@ -75,13 +30,6 @@ export function CreditCards() {
   const [tx, setTx] = useState<ApiTx[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const authHeaders = (): Headers => {
-    const token = localStorage.getItem("leofy_token");
-    const h = new Headers();
-    if (token) h.set("Authorization", `Bearer ${token}`);
-    return h;
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -91,17 +39,18 @@ export function CreditCards() {
         setLoading(true);
         setError(null);
 
-        const h = authHeaders();
+        const token = localStorage.getItem("leofy_token");
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const [resCards, resTx] = await Promise.all([
+          fetch(`${API_BASE}/api/cards`, { headers }),
+          fetch(`${API_BASE}/api/transactions`, { headers }),
+        ]);
 
-        // 1) cards
-        const resCards = await fetch(`${API_BASE}/api/cards`, { headers: h });
         const cardsJson = await resCards.json().catch(() => null);
         if (!resCards.ok) {
           throw new Error(cardsJson?.error || cardsJson?.message || "Failed to load cards");
         }
 
-        // 2) transactions (para calcular usedAmount)
-        const resTx = await fetch(`${API_BASE}/api/transactions`, { headers: h });
         const txJson = await resTx.json().catch(() => null);
         if (!resTx.ok) {
           throw new Error(txJson?.error || txJson?.message || "Failed to load transactions");
@@ -126,44 +75,16 @@ export function CreditCards() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [API_BASE]);
 
   // calcular usedAmount neto por card_id (EXPENSE suma, INCOME resta)
   const usedByCard = useMemo(() => {
-    const balanceByCard = new Map<string, number>();
-
-    for (const t of tx) {
-      const type = String((t as any).type || "").toUpperCase();
-      const cardIdRaw = (t as any).card_id ?? (t as any).cardId ?? null;
-      if (!cardIdRaw) continue;
-
-      const cid = toId(cardIdRaw);
-      const amt = toNumber((t as any).amount);
-      if (amt <= 0) continue;
-
-      const current = balanceByCard.get(cid) || 0;
-      if (type === "EXPENSE") {
-        balanceByCard.set(cid, current + amt);
-        continue;
-      }
-
-      if (type === "INCOME") {
-        balanceByCard.set(cid, current - amt);
-      }
-    }
-
-    const normalized = new Map<string, number>();
-    for (const [cid, balance] of balanceByCard.entries()) {
-      normalized.set(cid, Math.max(0, balance));
-    }
-
-    return normalized;
+    return computeNetUsedByCard(tx);
   }, [tx]);
 
   // UI cards: solo credit (credit_limit > 0)
   const uiCards: UiCard[] = useMemo(() => {
-    return cards
+    return applyCardOrder(cards.filter((c) => toNumber(c.credit_limit) > 0))
       .map((c) => {
         const creditLimit = toNumber(c.credit_limit);
         const id = toId(c.id);
@@ -173,10 +94,9 @@ export function CreditCards() {
           last4: c.last4 || "----",
           creditLimit,
           usedAmount: usedByCard.get(id) || 0,
-          colorClass: colorToGradient(c.color),
+          colorClass: cardColorToGradient(c.color),
         };
-      })
-      .filter((c) => c.creditLimit > 0);
+      });
   }, [cards, usedByCard]);
 
   const totals = useMemo(() => {

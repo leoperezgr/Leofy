@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { normalizeTransactions } from '../utils/transactionsMapper';
 import { DashboardOverview } from './DashboardOverview';
 import { DashboardNetAvailable } from './DashboardNetAvailable';
+import { DashboardSafeToSpend } from './DashboardSafeToSpend';
 import { applyCardOrder } from '../utils/cardOrder';
 import { LoadingScreen } from './LoadingScreen';
 import { useAppDate } from '../contexts/AppDateContext';
@@ -18,10 +19,12 @@ import {
   getCurrentCycleInfo,
   computeCycleExpenseDue,
   computeCyclePaymentTotal,
-  isLikelyCreditCardPayment,
-  getTransactionCardId,
+  computeThreeCycleAmounts,
+  computeNetUsedByCard,
   getClosingDay,
   formatDayDelta,
+  getThreeCycleRanges,
+  daysDiff,
 } from '../utils/creditCycleCalculator';
 import '../../styles/components/Dashboard.css';
 
@@ -42,7 +45,7 @@ type DashboardData = {
 };
 
 type Period = 'month' | 'week' | '30days' | 'year' | 'custom';
-type DashboardTab = 'overview' | 'net';
+type DashboardTab = 'overview' | 'net' | 'safe';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -159,21 +162,17 @@ export function Dashboard() {
         : '2';
 
       const token = localStorage.getItem('leofy_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const [res, txRes, cardsRes] = await Promise.all([
+        fetch(
+          `${API_BASE}/api/stats/dashboard?userId=${encodeURIComponent(userId)}`,
+          { headers }
+        ),
+        fetch(`${API_BASE}/api/transactions`, { headers }),
+        fetch(`${API_BASE}/api/cards`, { headers }),
+      ]);
 
-      const res = await fetch(
-        `${API_BASE}/api/stats/dashboard?userId=${encodeURIComponent(userId)}`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }
-      );
-      const txRes = await fetch(`${API_BASE}/api/transactions`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      const cardsRes = await fetch(`${API_BASE}/api/cards`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      const text = await res.text(); // ðŸ‘ˆ lee aunque no sea JSON
+      const text = await res.text();
       let json: any = null;
       try {
         json = text ? JSON.parse(text) : null;
@@ -399,14 +398,8 @@ export function Dashboard() {
   const totalCreditLimit = creditCards.reduce((sum, c) => sum + toNumber(c.credit_limit), 0);
   const totalCreditUsed = useMemo(() => {
     const creditIds = new Set(creditCards.map((card) => toId(card.id)));
-
-    return transactions.reduce((sum, tx) => {
-      const txCardId = getTransactionCardId(tx);
-      if (!txCardId || !creditIds.has(txCardId)) return sum;
-      if (String(tx.type || '').toUpperCase() !== 'EXPENSE') return sum;
-      if (isLikelyCreditCardPayment(tx)) return sum;
-      return sum + toNumber(tx.amount);
-    }, 0);
+    const netUsedByCard = computeNetUsedByCard(transactions, creditIds);
+    return Array.from(netUsedByCard.values()).reduce((sum, amount) => sum + amount, 0);
   }, [creditCards, transactions]);
   const creditUsagePercent = totalCreditLimit > 0 ? (totalCreditUsed / totalCreditLimit) * 100 : 0;
   const totalDebitAvailable = useMemo(() => {
@@ -518,6 +511,52 @@ export function Dashboard() {
   );
 
   const netAvailable = totalDebitAvailable - totalCreditDueThisCycle;
+
+  const { totalPastCycleRemaining, totalCurrentCycleAmount, creditCardItems } = useMemo(() => {
+    const today = getAppDate();
+    let pastRemaining = 0;
+    let currentRemaining = 0;
+
+    const items = creditCards.map((card) => {
+      const amounts = computeThreeCycleAmounts(card, transactions, today);
+      const ranges = getThreeCycleRanges(card, today);
+
+      pastRemaining += amounts.pastCycleRemainingAmount;
+      currentRemaining += amounts.currentCycleRemainingAmount;
+
+      let cycleProgressPercent = 0;
+      let cycleLabel = 'N/A';
+      if (ranges.currentCycle) {
+        const totalDays = daysDiff(ranges.currentCycle.start, ranges.currentCycle.end);
+        const elapsed = daysDiff(ranges.currentCycle.start, today);
+        cycleProgressPercent = totalDays > 0 ? Math.min(Math.max((elapsed / totalDays) * 100, 0), 100) : 0;
+        cycleLabel = ranges.currentCycle.label;
+      }
+
+      const lastStatementRemaining = amounts.pastCycleRemainingAmount;
+      const currentCycleAmt = amounts.currentCycleRemainingAmount;
+
+      return {
+        cardId: toId(card.id),
+        name: card.name,
+        colorClass: cardColorToGradient(card.color),
+        lastStatementRemaining,
+        currentCycleAmount: currentCycleAmt,
+        cycleProgressPercent,
+        cycleLabel,
+        totalCardBalance: lastStatementRemaining + currentCycleAmt,
+      };
+    });
+
+    return {
+      totalPastCycleRemaining: pastRemaining,
+      totalCurrentCycleAmount: currentRemaining,
+      creditCardItems: items,
+    };
+  }, [creditCards, transactions, getAppDate]);
+
+  const safeToSpend = totalDebitAvailable - totalPastCycleRemaining - totalCurrentCycleAmount;
+
   const todayLabel = getAppDate().toLocaleDateString('en-US', {
     weekday: 'long',
     day: 'numeric',
@@ -571,6 +610,17 @@ export function Dashboard() {
         >
           Net Available
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('safe')}
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+            activeTab === 'safe'
+              ? 'bg-[#2DD4BF] text-white shadow-sm'
+              : 'bg-white text-[#64748B] border border-gray-200'
+          }`}
+        >
+          Safe to Spend
+        </button>
       </div>
 
       {activeTab === 'overview' && (
@@ -604,6 +654,15 @@ export function Dashboard() {
           totalDebitAvailable={totalDebitAvailable}
           totalCreditDueThisCycle={totalCreditDueThisCycle}
           creditDueByCard={creditDueByCard}
+        />
+      )}
+
+      {activeTab === 'safe' && (
+        <DashboardSafeToSpend
+          safeToSpend={safeToSpend}
+          netAvailable={netAvailable}
+          totalCurrentCycleAmount={totalCurrentCycleAmount}
+          cardItems={creditCardItems}
         />
       )}
     </div>
