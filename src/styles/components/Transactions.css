@@ -233,6 +233,10 @@
   background: #f9fafb;
 }
 
+.tx-icon-wrap-transfer {
+  background: #eff6ff;
+}
+
 .tx-icon {
   height: 1.5rem;
   width: 1.5rem;
@@ -241,6 +245,10 @@
 .tx-icon-income,
 .tx-amount-income {
   color: #16a34a;
+}
+
+.tx-icon-transfer {
+  color: #3b82f6;
 }
 
 .tx-icon-expense {

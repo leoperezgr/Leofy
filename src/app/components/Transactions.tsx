@@ -100,8 +100,11 @@ const toNumber = (value: unknown) => {
 const dateToDay = (value: string | null | undefined) => {
   const source = value || new Date().toISOString();
   const parsed = new Date(source);
-  if (Number.isNaN(parsed.getTime())) return new Date().toISOString().split("T")[0];
-  return parsed.toISOString().split("T")[0];
+  if (Number.isNaN(parsed.getTime())) {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  }
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
 };
 
 const getInstallmentsInfo = (row: any, referenceDate: Date): InstallmentsInfo | null => {
@@ -603,16 +606,20 @@ export function Transactions() {
                       <div className="tx-row-left">
                         <div
                           className={`tx-icon-wrap ${
-                            !isTransferRow(transaction) && transaction.type === "income"
-                              ? "tx-icon-wrap-income"
-                              : "tx-icon-wrap-expense"
+                            isTransferRow(transaction)
+                              ? "tx-icon-wrap-transfer"
+                              : transaction.type === "income"
+                                ? "tx-icon-wrap-income"
+                                : "tx-icon-wrap-expense"
                           }`}
                         >
                           <IconComponent
                             className={`tx-icon ${
-                              !isTransferRow(transaction) && transaction.type === "income"
-                                ? "tx-icon-income"
-                                : "tx-icon-expense"
+                              isTransferRow(transaction)
+                                ? "tx-icon-transfer"
+                                : transaction.type === "income"
+                                  ? "tx-icon-income"
+                                  : "tx-icon-expense"
                             }`}
                           />
                         </div>
