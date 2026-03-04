@@ -1,30 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Wallet } from 'lucide-react';
 import { formatMoney } from '../utils/formatMoney';
-
-type CreditDueCardItem = {
-  cardId: string;
-  name: string;
-  cycleLabel: string;
-  dueEstimated: number;
-  paidInCycle: number;
-  remainingDue: number;
-  progressPercent: number;
-  colorClass: string;
-  source: 'cutoff' | 'fallback';
-  cutoffDate: Date | null;
-  dueDate: Date | null;
-  nextCutoffDate: Date | null;
-  cutoffDeltaLabel: string;
-  dueDeltaLabel: string;
-  nextCutoffDeltaLabel: string;
-  isPaid: boolean;
-  isOverdue: boolean;
-  daysOverdue: number;
-  isDueSoon: boolean;
-  daysUntilDue: number | null;
-  isWaitingForCutoff: boolean;
-};
+import { type CreditDueCardItem } from '../utils/creditCycleCalculator';
 
 type DashboardNetAvailableProps = {
   netAvailable: number;

@@ -11,9 +11,12 @@ Leofy is a full-stack personal finance web app for tracking income, expenses, cr
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React 18.3, TypeScript, Vite 6, React Router 7 |
-| Styling | Tailwind CSS 4, component CSS files, Shadcn/Radix UI |
+| Styling | Tailwind CSS 4, component CSS files, Shadcn/Radix UI, MUI |
+| CSS-in-JS | Emotion (for MUI) |
 | Charts | Recharts 2.15 |
 | Icons | Lucide React 0.487 |
+| Fonts | Inter (Google Fonts, 400-700) |
+| Notifications | Sonner (toast notifications) |
 | Backend | Express 5.2, Node.js |
 | ORM | Prisma 7.4 with PostgreSQL adapter |
 | Database | PostgreSQL (Aiven cloud), schema `leofy` |
@@ -47,6 +50,8 @@ Leofy/
 │
 ├── src/
 │   ├── main.tsx                   # Entry point
+│   ├── lib/
+│   │   └── auth.ts               # validateSession() — JWT verification utility
 │   ├── app/
 │   │   ├── App.tsx                # AppDateProvider + RouterProvider
 │   │   ├── routes.ts              # All route definitions + loaders
@@ -54,11 +59,14 @@ Leofy/
 │   │   │   └── AppDateContext.tsx  # Global date override for testing
 │   │   ├── components/
 │   │   │   ├── Layout.tsx         # Sidebar + mobile nav + date override banner
-│   │   │   ├── Dashboard.tsx      # Home: overview, net worth, credit cycles
+│   │   │   ├── Dashboard.tsx      # Home: container with Overview + Net Available tabs
+│   │   │   ├── DashboardOverview.tsx  # Overview tab: period charts, recent transactions
+│   │   │   ├── DashboardNetAvailable.tsx # Net Available tab: debit minus credit due
 │   │   │   ├── Login.tsx          # Email/password login
 │   │   │   ├── Onboarding.tsx     # First-time setup flow
 │   │   │   ├── Transactions.tsx   # Transaction list with filters
 │   │   │   ├── TransactionDetail.tsx  # Edit single transaction
+│   │   │   ├── TransferDetail.tsx # View/edit individual transfers
 │   │   │   ├── AddTransactionModal.tsx # Create income/expense/transfer
 │   │   │   ├── CreditCards.tsx    # Credit card list
 │   │   │   ├── CreditCardDetail.tsx   # Single card: cycle, chart, transactions
@@ -69,13 +77,21 @@ Leofy/
 │   │   │   ├── Settings.tsx       # Profile, password, logout
 │   │   │   ├── SettingsCategories.tsx  # Custom category editor with icons
 │   │   │   ├── TesterPanel.tsx    # Date override + function testing
-│   │   │   └── LoadingScreen.tsx  # Reusable loading state
+│   │   │   ├── LoadingScreen.tsx  # Reusable loading state
+│   │   │   ├── figma/
+│   │   │   │   └── ImageWithFallback.tsx # Image component with error fallback
+│   │   │   └── ui/               # Shadcn/Radix UI component library (~48 components)
+│   │   │       ├── Money.tsx      # Custom money display component
+│   │   │       ├── button.tsx, card.tsx, dialog.tsx, tabs.tsx, ...
+│   │   │       └── utils.ts      # cn() utility (clsx + tailwind-merge)
 │   │   └── utils/
 │   │       ├── formatMoney.ts     # Number → "1,234.50"
 │   │       ├── transactionsMapper.ts  # Normalize API → UI transaction shape
 │   │       ├── cardOrder.ts       # localStorage card ordering
 │   │       └── mockData.ts        # Default categories, icons, seed data
 │   └── styles/
+│       ├── index.css              # Consolidated CSS imports (fonts, tailwind, theme)
+│       ├── fonts.css              # Google Fonts (Inter 400-700)
 │       ├── theme.css              # CSS custom properties / design tokens
 │       ├── tailwind.css           # Tailwind directives
 │       └── components/            # Per-component CSS (matches component name)
@@ -156,8 +172,11 @@ Base: `http://localhost:4000` (env `VITE_API_BASE_URL`)
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/` | Create transfer: `{ fromCardId, toCardId, amount, description?, date? }` |
+| GET | `/:transferId` | Get transfer details (both linked transactions) |
+| PUT | `/:transferId` | Update transfer |
+| DELETE | `/:transferId` | Delete transfer (removes both linked transactions) |
 
-Transfer rules: Only from debit accounts. Creates 2 linked transactions (EXPENSE out + INCOME in) with same `transfer_id`.
+Transfer rules: Only from debit accounts. Creates 2 linked transactions (EXPENSE out + INCOME in) with same `transfer_id`. Metadata includes `transferRole`, `paymentMethod`, `fromCardId`, `toCardId`.
 
 ### Statistics (`/api/stats`)
 | Method | Path | Description |
@@ -201,7 +220,9 @@ Transfer rules: Only from debit accounts. Creates 2 linked transactions (EXPENSE
 ### Transfers
 - Creates paired EXPENSE + INCOME transactions linked by `transfer_id` (UUID)
 - Only from debit accounts (credit_limit = 0 or null)
+- Supports full CRUD: create, read, update, and delete
 - When "From Cash" selected in modal, posts directly to `/api/transactions` as INCOME on destination card (bypasses `/api/transfers` which requires numeric `fromCardId`)
+- TransferDetail component at route `/transactions/transfers/:transferId` for viewing/editing individual transfers
 
 ### Payment Methods
 - `cash`: no card association
@@ -239,6 +260,8 @@ RED, ORANGE, BLUE, GOLD, BLACK, PLATINUM, SILVER, PURPLE, GREEN, OTHER (default 
 - Component-specific CSS files in `src/styles/components/` matching component name
 - CSS custom properties in `theme.css`
 - Tailwind utilities for layout
+- Shadcn/Radix UI components in `src/app/components/ui/` for composable UI primitives
+- Font: Inter (imported via `fonts.css` from Google Fonts)
 - Cards use: `border: 1px solid #f3f4f6; border-radius: 1rem; padding: 1.5rem;`
 
 ---

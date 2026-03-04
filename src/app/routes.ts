@@ -13,6 +13,7 @@ import { Settings } from "./components/Settings";
 import { SettingsCategories } from "./components/SettingsCategories";
 import { ManageCards } from "./components/ManageCards";
 import { TransactionDetail } from "./components/TransactionDetail";
+import { TransferDetail } from "./components/TransferDetail";
 import { TesterPanel } from "./components/TesterPanel";
 
 // ✅ Flags reales
@@ -52,6 +53,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: Dashboard },
       { path: "transactions", Component: Transactions },
+      { path: "transactions/transfers/:transferId", Component: TransferDetail },
       { path: "transactions/:transactionId", Component: TransactionDetail },
       { path: "cards", Component: CreditCards },
       { path: "debit-cards", Component: DebitCards },

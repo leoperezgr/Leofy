@@ -2,9 +2,30 @@ import { useEffect, useMemo, useState } from 'react';
 import { normalizeTransactions } from '../utils/transactionsMapper';
 import { DashboardOverview } from './DashboardOverview';
 import { DashboardNetAvailable } from './DashboardNetAvailable';
+import { DashboardSafeToSpend } from './DashboardSafeToSpend';
 import { applyCardOrder } from '../utils/cardOrder';
 import { LoadingScreen } from './LoadingScreen';
 import { useAppDate } from '../contexts/AppDateContext';
+import {
+  type ApiTx,
+  type ApiCard,
+  type CreditDueCardItem,
+  toNumber,
+  toId,
+  startOfDay,
+  endOfDay,
+  addDays,
+  cardColorToGradient,
+  getCurrentCycleInfo,
+  computeCycleExpenseDue,
+  computeCyclePaymentTotal,
+  computeThreeCycleAmounts,
+  computeNetUsedByCard,
+  getClosingDay,
+  formatDayDelta,
+  getThreeCycleRanges,
+  daysDiff,
+} from '../utils/creditCycleCalculator';
 import '../../styles/components/Dashboard.css';
 
 type DashboardData = {
@@ -23,130 +44,10 @@ type DashboardData = {
   }>;
 };
 
-type ApiTx = {
-  id: string | number;
-  type: 'INCOME' | 'EXPENSE' | 'income' | 'expense';
-  amount: number | string;
-  description?: string | null;
-  occurred_at?: string;
-  created_at?: string;
-  date?: string;
-  category?: string | null;
-  category_id?: string | number | null;
-  metadata?: {
-    category_name?: string;
-    [key: string]: unknown;
-  } | null;
-  card_id?: string | number | null;
-  cardId?: string | number | null;
-  card?: {
-    id?: string | number | null;
-  } | null;
-};
-
-type ApiCard = {
-  id: string | number;
-  name: string;
-  last4: string | null;
-  brand?: 'VISA' | 'MASTERCARD' | 'AMEX' | 'OTHER' | null;
-  color?: string | null;
-  credit_limit: number | string | null;
-  closing_day?: number | string | null;
-  closingDay?: number | string | null;
-  cutoff_day?: number | string | null;
-  cutoffDay?: number | string | null;
-  due_day?: number | string | null;
-  dueDay?: number | string | null;
-  due_date?: string | Date | null;
-  dueDate?: string | Date | null;
-  cutoff_date?: string | Date | null;
-  cutoffDate?: string | Date | null;
-};
-
 type Period = 'month' | 'week' | '30days' | 'year' | 'custom';
-type DashboardTab = 'overview' | 'net';
-type CycleRangeSource = 'cutoff' | 'fallback';
-type CurrentCycleInfo = {
-  start: Date;
-  end: Date;
-  label: string;
-  source: CycleRangeSource;
-  cutoffDate: Date | null;
-  dueDate: Date | null;
-  nextCutoffDate: Date | null;
-  isWithinPaymentWindow: boolean;
-};
-type CreditDueCardItem = {
-  cardId: string;
-  name: string;
-  cycleLabel: string;
-  dueEstimated: number;
-  paidInCycle: number;
-  remainingDue: number;
-  progressPercent: number;
-  colorClass: string;
-  source: CycleRangeSource;
-  cutoffDate: Date | null;
-  dueDate: Date | null;
-  nextCutoffDate: Date | null;
-  cutoffDeltaLabel: string;
-  dueDeltaLabel: string;
-  nextCutoffDeltaLabel: string;
-  isPaid: boolean;
-  isOverdue: boolean;
-  daysOverdue: number;
-  isDueSoon: boolean;
-  daysUntilDue: number | null;
-  isWaitingForCutoff: boolean;
-};
+type DashboardTab = 'overview' | 'net' | 'safe';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-function toNumber(v: unknown) {
-  const n = typeof v === 'string' ? Number(v) : Number(v ?? 0);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function toId(v: string | number) {
-  return typeof v === 'number' ? String(v) : String(v);
-}
-
-function cardColorToGradient(color?: string | null) {
-  switch ((color || 'OTHER').toUpperCase()) {
-    case 'RED':
-      return 'from-red-500 to-rose-600';
-    case 'ORANGE':
-      return 'from-orange-500 to-amber-600';
-    case 'BLUE':
-      return 'from-blue-500 to-indigo-600';
-    case 'GOLD':
-      return 'from-yellow-400 to-amber-600';
-    case 'BLACK':
-      return 'from-gray-900 to-gray-700';
-    case 'PLATINUM':
-      return 'from-slate-300 to-slate-500';
-    case 'SILVER':
-      return 'from-gray-300 to-gray-500';
-    case 'PURPLE':
-      return 'from-purple-500 to-fuchsia-600';
-    case 'GREEN':
-      return 'from-emerald-500 to-teal-600';
-    default:
-      return 'from-[#2DD4BF] to-[#14B8A6]';
-  }
-}
-
-function startOfDay(d: Date) {
-  const next = new Date(d);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function endOfDay(d: Date) {
-  const next = new Date(d);
-  next.setHours(23, 59, 59, 999);
-  return next;
-}
 
 function startOfMonth(d: Date) {
   return startOfDay(new Date(d.getFullYear(), d.getMonth(), 1));
@@ -161,28 +62,6 @@ function startOfWeek(d: Date) {
 
 function startOfYear(d: Date) {
   return startOfDay(new Date(d.getFullYear(), 0, 1));
-}
-
-function addDays(d: Date, n: number) {
-  const next = new Date(d);
-  next.setDate(next.getDate() + n);
-  return next;
-}
-
-function safeDayInMonth(year: number, monthIndex0: number, day: number) {
-  const normalizedDay = Math.max(1, Math.trunc(day || 1));
-  const lastDay = new Date(year, monthIndex0 + 1, 0).getDate();
-  return new Date(year, monthIndex0, Math.min(normalizedDay, lastDay));
-}
-
-function daysDiff(from: Date, to: Date) {
-  const fromMs = startOfDay(from).getTime();
-  const toMs = startOfDay(to).getTime();
-  return Math.round((toMs - fromMs) / DAY_MS);
-}
-
-function diffMonths(a: Date, b: Date) {
-  return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
 }
 
 function toInputDateValue(d: Date) {
@@ -244,261 +123,6 @@ function getPeriodLabel(period: Period) {
   }
 }
 
-function formatRangeLabel(start: Date, end: Date) {
-  const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const endLabel = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return `${startLabel} – ${endLabel}`;
-}
-
-function formatDayDelta(target: Date, now: Date) {
-  const signedDays = daysDiff(now, target);
-  const absDays = Math.abs(signedDays);
-
-  if (signedDays < 0) {
-    return {
-      label: `was ${absDays} day${absDays === 1 ? '' : 's'} ago`,
-      isPast: true,
-      absDays,
-      signedDays,
-    };
-  }
-
-  if (signedDays === 0) {
-    return {
-      label: 'is today',
-      isPast: false,
-      absDays: 0,
-      signedDays: 0,
-    };
-  }
-
-  return {
-    label: `in ${signedDays} day${signedDays === 1 ? '' : 's'}`,
-    isPast: false,
-    absDays,
-    signedDays,
-  };
-}
-
-function safeParseDate(value: unknown): Date | null {
-  if (value instanceof Date) {
-    return Number.isFinite(value.getTime()) ? value : null;
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    const raw = value.trim();
-    const calendarMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-
-    if (calendarMatch) {
-      const year = Number(calendarMatch[1]);
-      const month = Number(calendarMatch[2]);
-      const day = Number(calendarMatch[3]);
-      const parsedCalendar = new Date(year, month - 1, day);
-      return Number.isFinite(parsedCalendar.getTime()) ? parsedCalendar : null;
-    }
-
-    const parsed = new Date(raw);
-    return Number.isFinite(parsed.getTime()) ? parsed : null;
-  }
-
-  return null;
-}
-
-
-function getLast30DaysRange(ref: Date) {
-  return {
-    start: startOfDay(addDays(ref, -30)),
-    end: endOfDay(ref),
-  };
-}
-
-function getCurrentCycleInfo(card: ApiCard, refDate: Date): CurrentCycleInfo {
-  const explicitDueDate = safeParseDate(
-    (card as any).dueDate ??
-    (card as any).due_date
-  );
-  const cutoffDayRaw =
-    (card as any).cutoffDay ??
-    (card as any).cutoff_day ??
-    (card as any).closingDay ??
-    (card as any).closing_day;
-  const dueDayRaw =
-    (card as any).dueDay ??
-    (card as any).due_day;
-  const cutoffDay = Math.trunc(toNumber(cutoffDayRaw));
-  const dueDay = Math.trunc(toNumber(dueDayRaw));
-
-  if (!Number.isFinite(cutoffDay) || cutoffDay <= 0) {
-    const fallback = getLast30DaysRange(refDate);
-    const dueDate = explicitDueDate ? startOfDay(explicitDueDate) : null;
-    return {
-      start: fallback.start,
-      end: fallback.end,
-      label: 'Last 30 Days',
-      source: 'fallback',
-      cutoffDate: null,
-      dueDate,
-      nextCutoffDate: null,
-      isWithinPaymentWindow: dueDate ? startOfDay(refDate).getTime() <= dueDate.getTime() : true,
-    };
-  }
-
-  const today = startOfDay(refDate);
-  const cutoffThisMonth = startOfDay(safeDayInMonth(today.getFullYear(), today.getMonth(), cutoffDay));
-  const cutoffActual = today.getTime() >= cutoffThisMonth.getTime()
-    ? cutoffThisMonth
-    : startOfDay(safeDayInMonth(today.getFullYear(), today.getMonth() - 1, cutoffDay));
-  const previousCutoff = safeDayInMonth(cutoffActual.getFullYear(), cutoffActual.getMonth() - 1, cutoffDay);
-  const cycleStart = startOfDay(addDays(previousCutoff, 1));
-  const nextCutoffDate = startOfDay(safeDayInMonth(cutoffActual.getFullYear(), cutoffActual.getMonth() + 1, cutoffDay));
-
-  const dueDate = Number.isFinite(dueDay) && dueDay > 0
-    ? startOfDay(
-        safeDayInMonth(cutoffActual.getFullYear(), cutoffActual.getMonth() + 1, dueDay)
-      )
-    : explicitDueDate
-      ? startOfDay(explicitDueDate)
-      : null;
-
-  return {
-    start: cycleStart,
-    end: endOfDay(cutoffActual),
-    label: formatRangeLabel(cycleStart, cutoffActual),
-    source: 'cutoff',
-    cutoffDate: startOfDay(cutoffActual),
-    dueDate,
-    nextCutoffDate,
-    isWithinPaymentWindow: dueDate ? today.getTime() <= dueDate.getTime() : true,
-  };
-}
-
-function getTransactionCategoryName(tx: ApiTx) {
-  const direct = typeof tx.category === 'string' ? tx.category.trim() : '';
-  if (direct) return direct;
-
-  const metadata = tx.metadata;
-  if (metadata && typeof metadata === 'object') {
-    const categoryName =
-      typeof metadata.category_name === 'string'
-        ? metadata.category_name.trim()
-        : typeof (metadata as any).categoryName === 'string'
-          ? String((metadata as any).categoryName).trim()
-          : '';
-    if (categoryName) return categoryName;
-  }
-
-  return '';
-}
-
-function isLikelyCreditCardPayment(tx: ApiTx) {
-  const category = getTransactionCategoryName(tx).toLowerCase();
-  const description = String(tx.description || '').trim().toLowerCase();
-  const exactCategorySignals = new Set([
-    'credit card payment',
-    'card payment',
-    'payment to card',
-    'credit payment',
-    'pago tarjeta',
-    'pago de tarjeta',
-    'pago tc',
-    'pago tdc',
-  ]);
-  const exactDescriptionSignals = new Set([
-    'credit card payment',
-    'card payment',
-    'payment to card',
-    'payment to credit card',
-    'pago tarjeta',
-    'pago de tarjeta',
-    'pago tc',
-    'pago tdc',
-  ]);
-
-  if (category && exactCategorySignals.has(category)) return true;
-  if (description && exactDescriptionSignals.has(description)) return true;
-
-  if (description.startsWith('payment to card')) return true;
-  if (description.startsWith('payment to credit card')) return true;
-  if (description.startsWith('pago de tarjeta')) return true;
-  if (description.startsWith('pago tarjeta')) return true;
-
-  return false;
-}
-
-function getInstallmentCycleEnd(startAtDate: Date, closingDay: number) {
-  const purchaseDate = startOfDay(startAtDate);
-  const sameMonthCutoff = safeDayInMonth(purchaseDate.getFullYear(), purchaseDate.getMonth(), closingDay);
-
-  if (purchaseDate.getTime() <= startOfDay(sameMonthCutoff).getTime()) {
-    return startOfDay(sameMonthCutoff);
-  }
-
-  return startOfDay(safeDayInMonth(purchaseDate.getFullYear(), purchaseDate.getMonth() + 1, closingDay));
-}
-
-function computeCycleExpenseDue(
-  transactions: ApiTx[],
-  currentCardId: string,
-  start: Date,
-  end: Date,
-  closingDay: number
-) {
-  return Math.max(0, transactions.reduce((sum, tx) => {
-    const txCardId = getTransactionCardId(tx);
-    if (!txCardId || txCardId !== currentCardId) return sum;
-
-    const txType = String(tx.type || '').toUpperCase();
-    if (txType !== 'EXPENSE') return sum;
-    if (isLikelyCreditCardPayment(tx)) return sum;
-
-    const amount = toNumber(tx.amount);
-    if (amount <= 0) return sum;
-
-    const rawDate = tx.occurred_at || tx.created_at || tx.date;
-    if (!rawDate) return sum;
-
-    const occurredAt = new Date(rawDate);
-    if (!Number.isFinite(occurredAt.getTime())) return sum;
-
-    const installments = (tx as any)?.metadata?.installments;
-    if (installments && typeof installments === 'object') {
-      const months = Math.trunc(toNumber((installments as any).months));
-      if (months < 2 || months > 60) return sum;
-
-      const monthlyAmount =
-        (installments as any).monthlyAmount !== undefined
-          ? toNumber((installments as any).monthlyAmount)
-          : toNumber(Number((amount / months).toFixed(2)));
-      if (monthlyAmount <= 0) return sum;
-
-      const startAtRaw = (installments as any).startAt || rawDate;
-      const startAtDate = new Date(startAtRaw);
-      if (!Number.isFinite(startAtDate.getTime())) return sum;
-
-      const firstCycleEnd = Number.isFinite(closingDay) && closingDay > 0
-        ? getInstallmentCycleEnd(startAtDate, closingDay)
-        : startOfDay(startAtDate);
-      const monthsElapsed = diffMonths(firstCycleEnd, startOfDay(end));
-      if (monthsElapsed >= 0 && monthsElapsed < months) {
-        return sum + monthlyAmount;
-      }
-      return sum;
-    }
-
-    return occurredAt >= start && occurredAt <= end ? sum + amount : sum;
-  }, 0));
-}
-
-function sumAmounts(rows: ApiTx[]) {
-  return rows.reduce((sum, row) => sum + toNumber(row.amount), 0);
-}
-
-function getTransactionCardId(tx: ApiTx) {
-  const raw = tx.card_id ?? tx.cardId ?? tx.card?.id ?? null;
-  if (raw === null || raw === undefined) return '';
-  return toId(raw);
-}
-
 export function Dashboard() {
   const { getAppDate } = useAppDate();
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
@@ -538,21 +162,17 @@ export function Dashboard() {
         : '2';
 
       const token = localStorage.getItem('leofy_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const [res, txRes, cardsRes] = await Promise.all([
+        fetch(
+          `${API_BASE}/api/stats/dashboard?userId=${encodeURIComponent(userId)}`,
+          { headers }
+        ),
+        fetch(`${API_BASE}/api/transactions`, { headers }),
+        fetch(`${API_BASE}/api/cards`, { headers }),
+      ]);
 
-      const res = await fetch(
-        `${API_BASE}/api/stats/dashboard?userId=${encodeURIComponent(userId)}`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }
-      );
-      const txRes = await fetch(`${API_BASE}/api/transactions`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      const cardsRes = await fetch(`${API_BASE}/api/cards`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      const text = await res.text(); // ðŸ‘ˆ lee aunque no sea JSON
+      const text = await res.text();
       let json: any = null;
       try {
         json = text ? JSON.parse(text) : null;
@@ -778,14 +398,8 @@ export function Dashboard() {
   const totalCreditLimit = creditCards.reduce((sum, c) => sum + toNumber(c.credit_limit), 0);
   const totalCreditUsed = useMemo(() => {
     const creditIds = new Set(creditCards.map((card) => toId(card.id)));
-
-    return transactions.reduce((sum, tx) => {
-      const txCardId = getTransactionCardId(tx);
-      if (!txCardId || !creditIds.has(txCardId)) return sum;
-      if (String(tx.type || '').toUpperCase() !== 'EXPENSE') return sum;
-      if (isLikelyCreditCardPayment(tx)) return sum;
-      return sum + toNumber(tx.amount);
-    }, 0);
+    const netUsedByCard = computeNetUsedByCard(transactions, creditIds);
+    return Array.from(netUsedByCard.values()).reduce((sum, amount) => sum + amount, 0);
   }, [creditCards, transactions]);
   const creditUsagePercent = totalCreditLimit > 0 ? (totalCreditUsed / totalCreditLimit) * 100 : 0;
   const totalDebitAvailable = useMemo(() => {
@@ -810,33 +424,7 @@ export function Dashboard() {
       .map((card) => {
         const cardId = toId(card.id);
         const cycle = getCurrentCycleInfo(card, today);
-        const cycleRows = transactions.filter((tx) => {
-          const txCardId = getTransactionCardId(tx);
-          if (!txCardId || txCardId !== cardId) return false;
-
-          const rawDate = tx.occurred_at || tx.created_at || tx.date;
-          if (!rawDate) return false;
-
-          const txDate = new Date(rawDate);
-          if (!Number.isFinite(txDate.getTime())) return false;
-
-          return txDate >= cycle.start && txDate <= cycle.end;
-        });
-
-        const paymentRows = cycleRows.filter((tx) => {
-          const txType = String(tx.type || '').toUpperCase();
-          if (txType === 'INCOME') return true;
-          if (txType !== 'EXPENSE') return false;
-          return isLikelyCreditCardPayment(tx);
-        });
-        const cutoffDay = Math.trunc(
-          toNumber(
-            (card as any).cutoffDay ??
-            (card as any).cutoff_day ??
-            (card as any).closingDay ??
-            (card as any).closing_day
-          )
-        );
+        const cutoffDay = getClosingDay(card);
         const dueEstimated = computeCycleExpenseDue(
           transactions,
           cardId,
@@ -844,7 +432,12 @@ export function Dashboard() {
           cycle.end,
           cutoffDay
         );
-        const paidInCycle = sumAmounts(paymentRows);
+        const paidInCycle = computeCyclePaymentTotal(
+          transactions,
+          cardId,
+          cycle.start,
+          endOfDay(today)
+        );
         const remainingDue = Math.max(dueEstimated - paidInCycle, 0);
         const progressPercent = dueEstimated > 0
           ? Math.min((paidInCycle / dueEstimated) * 100, 100)
@@ -918,6 +511,52 @@ export function Dashboard() {
   );
 
   const netAvailable = totalDebitAvailable - totalCreditDueThisCycle;
+
+  const { totalPastCycleRemaining, totalCurrentCycleAmount, creditCardItems } = useMemo(() => {
+    const today = getAppDate();
+    let pastRemaining = 0;
+    let currentRemaining = 0;
+
+    const items = creditCards.map((card) => {
+      const amounts = computeThreeCycleAmounts(card, transactions, today);
+      const ranges = getThreeCycleRanges(card, today);
+
+      pastRemaining += amounts.pastCycleRemainingAmount;
+      currentRemaining += amounts.currentCycleRemainingAmount;
+
+      let cycleProgressPercent = 0;
+      let cycleLabel = 'N/A';
+      if (ranges.currentCycle) {
+        const totalDays = daysDiff(ranges.currentCycle.start, ranges.currentCycle.end);
+        const elapsed = daysDiff(ranges.currentCycle.start, today);
+        cycleProgressPercent = totalDays > 0 ? Math.min(Math.max((elapsed / totalDays) * 100, 0), 100) : 0;
+        cycleLabel = ranges.currentCycle.label;
+      }
+
+      const lastStatementRemaining = amounts.pastCycleRemainingAmount;
+      const currentCycleAmt = amounts.currentCycleRemainingAmount;
+
+      return {
+        cardId: toId(card.id),
+        name: card.name,
+        colorClass: cardColorToGradient(card.color),
+        lastStatementRemaining,
+        currentCycleAmount: currentCycleAmt,
+        cycleProgressPercent,
+        cycleLabel,
+        totalCardBalance: lastStatementRemaining + currentCycleAmt,
+      };
+    });
+
+    return {
+      totalPastCycleRemaining: pastRemaining,
+      totalCurrentCycleAmount: currentRemaining,
+      creditCardItems: items,
+    };
+  }, [creditCards, transactions, getAppDate]);
+
+  const safeToSpend = totalDebitAvailable - totalPastCycleRemaining - totalCurrentCycleAmount;
+
   const todayLabel = getAppDate().toLocaleDateString('en-US', {
     weekday: 'long',
     day: 'numeric',
@@ -971,6 +610,17 @@ export function Dashboard() {
         >
           Net Available
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('safe')}
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+            activeTab === 'safe'
+              ? 'bg-[#2DD4BF] text-white shadow-sm'
+              : 'bg-white text-[#64748B] border border-gray-200'
+          }`}
+        >
+          Safe to Spend
+        </button>
       </div>
 
       {activeTab === 'overview' && (
@@ -1004,6 +654,15 @@ export function Dashboard() {
           totalDebitAvailable={totalDebitAvailable}
           totalCreditDueThisCycle={totalCreditDueThisCycle}
           creditDueByCard={creditDueByCard}
+        />
+      )}
+
+      {activeTab === 'safe' && (
+        <DashboardSafeToSpend
+          safeToSpend={safeToSpend}
+          netAvailable={netAvailable}
+          totalCurrentCycleAmount={totalCurrentCycleAmount}
+          cardItems={creditCardItems}
         />
       )}
     </div>
