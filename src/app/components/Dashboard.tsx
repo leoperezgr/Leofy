@@ -918,6 +918,12 @@ export function Dashboard() {
   );
 
   const netAvailable = totalDebitAvailable - totalCreditDueThisCycle;
+  const todayLabel = getAppDate().toLocaleDateString('en-US', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 
   if (loading) {
     return (
@@ -936,7 +942,7 @@ export function Dashboard() {
           <h1 className="text-3xl font-semibold text-[#1F2933] mb-2">
             {userName ? `Welcome, ${userName}` : 'Welcome'}
           </h1>
-          <p className="text-[#64748B]">Here's your financial overview for {getPeriodLabel(period).toLowerCase()}</p>
+          <p className="text-[#64748B]">Today is {todayLabel}</p>
         </div>
         <div className="dashboard-header-badges">
           <span className="dashboard-badge">{getPeriodLabel(period)}</span>
