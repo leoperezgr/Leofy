@@ -269,6 +269,13 @@
   gap: 0.5rem;
 }
 
+.settings-category-toolbar {
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
 .settings-category-type-row {
   display: flex;
   gap: 0.5rem;
@@ -283,12 +290,135 @@
   font-size: 0.75rem;
   font-weight: 600;
   transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+  cursor: pointer;
 }
 
 .settings-category-type-btn-active {
   border-color: #2dd4bf;
   background: #2dd4bf;
   color: #fff;
+}
+
+.settings-category-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.settings-category-summary-chip {
+  display: grid;
+  gap: 0.2rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.875rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  padding: 0.85rem 0.95rem;
+}
+
+.settings-category-summary-value {
+  color: #1f2933;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.settings-category-summary-label {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.settings-category-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.settings-category-editor-pro,
+.settings-category-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  padding: 1rem;
+}
+
+.settings-category-editor-pro {
+  gap: 1rem;
+}
+
+.settings-category-editor-head,
+.settings-category-panel-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.settings-category-editor-title,
+.settings-category-panel-title {
+  margin: 0;
+  color: #1f2933;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.settings-category-editor-subtitle,
+.settings-category-panel-subtitle,
+.settings-category-row-subtext,
+.settings-category-empty-subtext,
+.settings-category-hint {
+  margin: 0.25rem 0 0;
+  color: #64748b;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.settings-category-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid #dbeafe;
+  border-radius: 0.875rem;
+  background: linear-gradient(135deg, #ecfeff 0%, #f8fafc 100%);
+  padding: 0.85rem;
+}
+
+.settings-category-preview-icon {
+  display: flex;
+  height: 3rem;
+  width: 3rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
+  color: #fff;
+  box-shadow: 0 10px 24px rgb(20 184 166 / 0.2);
+}
+
+.settings-category-preview-icon-svg {
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
+.settings-category-preview-name {
+  margin: 0;
+  color: #1f2933;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.settings-category-preview-type {
+  margin: 0.2rem 0 0;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.settings-category-name-input {
+  min-height: 3rem;
+}
+
+.settings-icon-grid-expanded {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
 }
 
 .settings-icon-grid {
@@ -300,24 +430,36 @@
 .settings-icon-option {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
   border: 1px solid #e2e8f0;
-  border-radius: 0.625rem;
+  border-radius: 0.875rem;
   background: #fff;
-  padding: 0.35rem;
+  padding: 0.65rem 0.75rem;
   color: #64748b;
   transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+  cursor: pointer;
+  text-align: left;
 }
 
 .settings-icon-option-active {
   border-color: #2dd4bf;
-  background: #e6fffb;
+  background: #ecfeff;
   color: #0f766e;
+  box-shadow: 0 0 0 1px rgb(45 212 191 / 0.25);
 }
 
 .settings-icon-option-icon {
   height: 1rem;
   width: 1rem;
+  flex-shrink: 0;
+}
+
+.settings-icon-option-label {
+  min-width: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .settings-category-left,
@@ -332,6 +474,8 @@
 
 .settings-category-actions {
   gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .settings-category-icon-wrap {
@@ -358,16 +502,69 @@
 
 .settings-category-delete-btn {
   border: 0;
+  border-radius: 0.625rem;
   background: transparent;
   color: #ef4444;
   font-size: 0.75rem;
   font-weight: 600;
+  padding: 0.4rem 0.55rem;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.settings-category-delete-btn:hover {
+  background: #fef2f2;
+  color: #dc2626;
 }
 
 .settings-category-name,
 .settings-about-name {
   color: #1f2933;
   font-weight: 500;
+}
+
+.settings-category-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.settings-category-panel-badge,
+.settings-category-usage-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.settings-category-panel-badge {
+  align-self: flex-start;
+  background: #ecfeff;
+  padding: 0.45rem 0.7rem;
+  color: #0f766e;
+}
+
+.settings-category-usage-pill {
+  background: #f1f5f9;
+  padding: 0.4rem 0.65rem;
+  color: #475569;
+}
+
+.settings-category-list-pro {
+  gap: 0.75rem;
+}
+
+.settings-category-empty {
+  display: grid;
+  gap: 0.3rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 0.875rem;
+  background: #f8fafc;
+  padding: 1rem;
+  text-align: center;
 }
 
 .settings-category-meta {
@@ -430,5 +627,51 @@
 @media (min-width: 1024px) {
   .settings-page {
     padding: 2rem;
+  }
+
+  .settings-category-toolbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .settings-category-view-row {
+    margin-bottom: 0;
+  }
+
+  .settings-category-layout {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .settings-category-editor-head,
+  .settings-category-panel-head {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .settings-icon-grid-expanded {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .settings-header,
+  .settings-category-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-category-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-category-actions {
+    justify-content: space-between;
+  }
+
+  .settings-icon-grid-expanded {
+    grid-template-columns: 1fr;
   }
 }
