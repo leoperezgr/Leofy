@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { categories as mockCategories } from "../utils/mockData";
 import { UiTransaction, normalizeTransactions } from "../utils/transactionsMapper";
 import { formatMoney } from "../utils/formatMoney";
+import { useAppDate } from "../contexts/AppDateContext";
 import { LoadingScreen } from "./LoadingScreen";
 
 type Card = {
@@ -87,6 +88,7 @@ function cleanAmountInput(value: string) {
 }
 
 export function TransactionDetail() {
+  const { getAppDate } = useAppDate();
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
   const { transactionId } = useParams<{ transactionId: string }>();
   const nav = useNavigate();
@@ -105,6 +107,7 @@ export function TransactionDetail() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [tx, setTx] = useState<UiTransaction | null>(null);
@@ -358,7 +361,7 @@ export function TransactionDetail() {
     const occurredAt =
       rawTx?.occurred_at ||
       rawTx?.created_at ||
-      (tx.date ? new Date(tx.date).toISOString() : new Date().toISOString());
+      (tx.date ? new Date(tx.date).toISOString() : getAppDate().toISOString());
 
     try {
       setSaving(true);
@@ -407,6 +410,33 @@ export function TransactionDetail() {
       setError(e?.message || "Error saving transaction");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onDelete() {
+    if (!transactionId) return;
+
+    const confirmed = window.confirm("Delete this transaction permanently?");
+    if (!confirmed) return;
+
+    try {
+      setDeleting(true);
+      setError(null);
+
+      const h = new Headers(authHeaders);
+      const res = await fetch(`${API_BASE}/api/transactions/${transactionId}`, {
+        method: "DELETE",
+        headers: h,
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || data?.message || "Failed to delete transaction");
+
+      nav("/transactions");
+    } catch (e: any) {
+      setError(e?.message || "Error deleting transaction");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -610,7 +640,7 @@ export function TransactionDetail() {
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || deleting}
               className="flex-1 inline-flex items-center justify-center gap-2 py-4 bg-[#2DD4BF] text-white font-semibold rounded-xl hover:bg-[#14B8A6] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
             >
               <Save className="w-4 h-4" />
@@ -625,6 +655,18 @@ export function TransactionDetail() {
             </Link>
           </div>
         </form>
+
+        <div className="mt-8 border-t border-gray-100 pt-6">
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={saving || deleting}
+            className="inline-flex items-center justify-center gap-2 py-3 px-4 bg-red-50 text-red-700 font-semibold rounded-xl hover:bg-red-100 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="w-4 h-4" />
+            {deleting ? "Deleting..." : "Delete Transaction"}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { formatMoney } from "../utils/formatMoney";
+import { LoadingScreen } from "./LoadingScreen";
 import "../../styles/components/CreditCards.css";
 
 type ApiCard = {
@@ -172,6 +173,15 @@ export function CreditCards() {
     return { totalUsed, totalLimit };
   }, [uiCards]);
 
+  if (loading) {
+    return (
+      <LoadingScreen
+        title="Credit Cards"
+        message="Loading your credit cards..."
+      />
+    );
+  }
+
   return (
     <div className="cc-page">
       {/* Header */}
@@ -204,11 +214,7 @@ export function CreditCards() {
       </div>
 
       {/* List */}
-      {loading ? (
-        <div className="cc-content-box">
-          <p className="cc-muted-text">Loading cards…</p>
-        </div>
-      ) : uiCards.length === 0 ? (
+      {uiCards.length === 0 ? (
         <div className="cc-content-box">
           <p className="cc-muted-text">No credit cards found.</p>
           <p className="cc-tip-text">Tip: add a card with a credit limit in Manage Cards.</p>

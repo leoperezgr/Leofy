@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "rec
 import * as LucideIcons from "lucide-react";
 import { formatMoney } from "../utils/formatMoney";
 import { getCategoryIcon } from "../utils/mockData"; // si ya tienes un mapper real, lo cambiamos luego
+import { useAppDate } from "../contexts/AppDateContext";
 import { LoadingScreen } from "./LoadingScreen";
 import "../../styles/components/CardDetail.css";
 
@@ -73,6 +74,7 @@ function colorToGradient(color?: string | null) {
 }
 
 export function CardDetail() {
+  const { getAppDate } = useAppDate();
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
   const { cardId } = useParams<{ cardId: string }>();
 
@@ -223,7 +225,7 @@ export function CardDetail() {
 
   const last30Days = useMemo(() => {
     const days = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date();
+      const date = new Date(getAppDate());
       date.setDate(date.getDate() - (29 - i));
       const iso = date.toISOString().split("T")[0];
 
@@ -235,7 +237,7 @@ export function CardDetail() {
     });
 
     return days;
-  }, [cardTransactions]);
+  }, [cardTransactions, getAppDate]);
 
   const getIconComponent = (iconName: string) => {
     const Icon = (LucideIcons as any)[iconName];
@@ -433,5 +435,4 @@ export function CardDetail() {
     </div>
   );
 }
-
 

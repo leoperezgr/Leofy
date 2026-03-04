@@ -26,6 +26,7 @@ authRouter.post("/login", async (req, res) => {
         is_active: true,
         last_login_at: true,
         created_at: true,
+        role: true,
       },
     });
 
@@ -35,7 +36,7 @@ authRouter.post("/login", async (req, res) => {
     if (!ok) return res.status(401).json({ error: "Credenciales inválidas" });
 
     const token = jwt.sign(
-      { userId: user.id.toString() },
+      { userId: user.id.toString(), role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
     );
@@ -67,6 +68,7 @@ authRouter.get("/me", requireAuth, async (req, res) => {
         is_active: true,
         last_login_at: true,
         created_at: true,
+        role: true,
       },
     });
 

@@ -11,6 +11,7 @@ import { cardsRouter } from "./routes/cards.routes.js";
 import { statsRouter } from "./routes/stats.routes.js";
 import { categoriesRouter } from "./routes/categories.routes.js";
 import { transfersRouter } from "./routes/transfers.routes.js";
+import { testerRouter } from "./routes/tester.routes.js";
 
 // ✅ BigInt -> string en JSON
 BigInt.prototype.toJSON = function () {
@@ -33,6 +34,7 @@ app.use("/api/cards", cardsRouter);
 app.use("/api/stats", statsRouter);
 app.use("/api/categories", categoriesRouter);
 app.use("/api/transfers", transfersRouter);
+app.use("/api/tester", testerRouter);
 
 const port = Number(process.env.PORT || 4000);
 app.listen(port, () => console.log(`API running on http://localhost:${port}`));

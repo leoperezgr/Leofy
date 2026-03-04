@@ -16,6 +16,7 @@ model User {
   is_active      Boolean   @default(true)
   last_login_at  DateTime? @db.Timestamptz(6)
   created_at     DateTime  @default(now()) @db.Timestamptz(6)
+  role           user_role @default(USER)
 
   @@map("users")
   @@schema("leofy")
@@ -100,6 +101,14 @@ enum card_brand {
 enum transaction_type {
   INCOME
   EXPENSE
+
+  @@schema("leofy")
+}
+
+enum user_role {
+  USER
+  TESTER
+  ADMIN
 
   @@schema("leofy")
 }

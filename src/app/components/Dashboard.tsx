@@ -1,11 +1,10 @@
-﻿import { Link } from 'react-router-dom';
-import { ArrowUpRight, ArrowDownRight, Wallet, DollarSign } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { normalizeTransactions } from '../utils/transactionsMapper';
-import { BarChart, Bar, XAxis, ResponsiveContainer, LabelList } from 'recharts';
-import { formatMoney } from '../utils/formatMoney';
+import { DashboardOverview } from './DashboardOverview';
+import { DashboardNetAvailable } from './DashboardNetAvailable';
 import { applyCardOrder } from '../utils/cardOrder';
 import { LoadingScreen } from './LoadingScreen';
+import { useAppDate } from '../contexts/AppDateContext';
 import '../../styles/components/Dashboard.css';
 
 type DashboardData = {
@@ -74,6 +73,8 @@ type CurrentCycleInfo = {
   source: CycleRangeSource;
   cutoffDate: Date | null;
   dueDate: Date | null;
+  nextCutoffDate: Date | null;
+  isWithinPaymentWindow: boolean;
 };
 type CreditDueCardItem = {
   cardId: string;
@@ -87,13 +88,16 @@ type CreditDueCardItem = {
   source: CycleRangeSource;
   cutoffDate: Date | null;
   dueDate: Date | null;
+  nextCutoffDate: Date | null;
   cutoffDeltaLabel: string;
   dueDeltaLabel: string;
+  nextCutoffDeltaLabel: string;
   isPaid: boolean;
   isOverdue: boolean;
   daysOverdue: number;
   isDueSoon: boolean;
   daysUntilDue: number | null;
+  isWaitingForCutoff: boolean;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -132,26 +136,6 @@ function cardColorToGradient(color?: string | null) {
   }
 }
 
-function renderBarAmountLabel(props: any) {
-  const { x, y, width, value } = props;
-  const amount = Number(value || 0);
-  if (!Number.isFinite(amount)) return null;
-  const labelY = typeof y === 'number' ? Math.max(14, y - 6) : 14;
-
-  return (
-    <text
-      x={x + width / 2}
-      y={labelY}
-      textAnchor="middle"
-      fill="#1F2933"
-      fontSize={12}
-      fontWeight={500}
-    >
-      ${formatMoney(amount)}
-    </text>
-  );
-}
-
 function startOfDay(d: Date) {
   const next = new Date(d);
   next.setHours(0, 0, 0, 0);
@@ -185,12 +169,6 @@ function addDays(d: Date, n: number) {
   return next;
 }
 
-function addMonths(d: Date, n: number) {
-  const next = new Date(d);
-  next.setMonth(next.getMonth() + n);
-  return next;
-}
-
 function safeDayInMonth(year: number, monthIndex0: number, day: number) {
   const normalizedDay = Math.max(1, Math.trunc(day || 1));
   const lastDay = new Date(year, monthIndex0 + 1, 0).getDate();
@@ -201,6 +179,10 @@ function daysDiff(from: Date, to: Date) {
   const fromMs = startOfDay(from).getTime();
   const toMs = startOfDay(to).getTime();
   return Math.round((toMs - fromMs) / DAY_MS);
+}
+
+function diffMonths(a: Date, b: Date) {
+  return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
 }
 
 function toInputDateValue(d: Date) {
@@ -223,8 +205,7 @@ function parseInputDate(value: string, fallback: Date) {
   return new Date(year, month - 1, day);
 }
 
-function getDateRange(period: Period, customStartDate: string, customEndDate: string) {
-  const today = new Date();
+function getDateRange(period: Period, customStartDate: string, customEndDate: string, today: Date = new Date()) {
 
   switch (period) {
     case 'week':
@@ -323,15 +304,6 @@ function safeParseDate(value: unknown): Date | null {
   return null;
 }
 
-function getNextMonthlyDate(dayOfMonth: number, ref: Date) {
-  const normalizedDay = Math.max(1, Math.trunc(dayOfMonth || 1));
-  const thisMonthCandidate = safeDayInMonth(ref.getFullYear(), ref.getMonth(), normalizedDay);
-  if (startOfDay(thisMonthCandidate).getTime() >= startOfDay(ref).getTime()) {
-    return thisMonthCandidate;
-  }
-
-  return safeDayInMonth(ref.getFullYear(), ref.getMonth() + 1, normalizedDay);
-}
 
 function getLast30DaysRange(ref: Date) {
   return {
@@ -341,10 +313,6 @@ function getLast30DaysRange(ref: Date) {
 }
 
 function getCurrentCycleInfo(card: ApiCard, refDate: Date): CurrentCycleInfo {
-  const explicitCutoffDate = safeParseDate(
-    (card as any).cutoffDate ??
-    (card as any).cutoff_date
-  );
   const explicitDueDate = safeParseDate(
     (card as any).dueDate ??
     (card as any).due_date
@@ -360,65 +328,37 @@ function getCurrentCycleInfo(card: ApiCard, refDate: Date): CurrentCycleInfo {
   const cutoffDay = Math.trunc(toNumber(cutoffDayRaw));
   const dueDay = Math.trunc(toNumber(dueDayRaw));
 
-  if (explicitCutoffDate) {
-    const cutoffDate = startOfDay(explicitCutoffDate);
-    const previousCutoff = Number.isFinite(cutoffDay) && cutoffDay > 0
-      ? safeDayInMonth(cutoffDate.getFullYear(), cutoffDate.getMonth() - 1, cutoffDay)
-      : addMonths(cutoffDate, -1);
-    const cycleStart = startOfDay(addDays(previousCutoff, 1));
-
-    let dueDate = explicitDueDate ? startOfDay(explicitDueDate) : null;
-    if (!dueDate && Number.isFinite(dueDay) && dueDay > 0) {
-      const dueMonthOffset = Number.isFinite(cutoffDay) && cutoffDay > 0 && dueDay >= cutoffDay ? 0 : 1;
-      dueDate = startOfDay(
-        safeDayInMonth(cutoffDate.getFullYear(), cutoffDate.getMonth() + dueMonthOffset, dueDay)
-      );
-    }
-    if (dueDate && dueDate.getTime() <= cutoffDate.getTime()) {
-      dueDate = startOfDay(
-        safeDayInMonth(dueDate.getFullYear(), dueDate.getMonth() + 1, dueDate.getDate())
-      );
-    }
-
-    return {
-      start: cycleStart,
-      end: endOfDay(cutoffDate),
-      label: formatRangeLabel(cycleStart, cutoffDate),
-      source: 'cutoff',
-      cutoffDate,
-      dueDate,
-    };
-  }
-
   if (!Number.isFinite(cutoffDay) || cutoffDay <= 0) {
     const fallback = getLast30DaysRange(refDate);
+    const dueDate = explicitDueDate ? startOfDay(explicitDueDate) : null;
     return {
       start: fallback.start,
       end: fallback.end,
       label: 'Last 30 Days',
       source: 'fallback',
       cutoffDate: null,
-      dueDate: explicitDueDate ? startOfDay(explicitDueDate) : null,
+      dueDate,
+      nextCutoffDate: null,
+      isWithinPaymentWindow: dueDate ? startOfDay(refDate).getTime() <= dueDate.getTime() : true,
     };
   }
 
-  const cutoffActual = getNextMonthlyDate(cutoffDay, refDate);
+  const today = startOfDay(refDate);
+  const cutoffThisMonth = startOfDay(safeDayInMonth(today.getFullYear(), today.getMonth(), cutoffDay));
+  const cutoffActual = today.getTime() >= cutoffThisMonth.getTime()
+    ? cutoffThisMonth
+    : startOfDay(safeDayInMonth(today.getFullYear(), today.getMonth() - 1, cutoffDay));
   const previousCutoff = safeDayInMonth(cutoffActual.getFullYear(), cutoffActual.getMonth() - 1, cutoffDay);
   const cycleStart = startOfDay(addDays(previousCutoff, 1));
+  const nextCutoffDate = startOfDay(safeDayInMonth(cutoffActual.getFullYear(), cutoffActual.getMonth() + 1, cutoffDay));
 
-  let dueDate = explicitDueDate ? startOfDay(explicitDueDate) : null;
-  if (!dueDate && Number.isFinite(dueDay) && dueDay > 0) {
-    const dueMonthOffset = dueDay >= cutoffDay ? 0 : 1;
-    dueDate = startOfDay(
-      safeDayInMonth(cutoffActual.getFullYear(), cutoffActual.getMonth() + dueMonthOffset, dueDay)
-    );
-  }
-  if (dueDate && dueDate.getTime() <= startOfDay(cutoffActual).getTime()) {
-    const dueDateDay = dueDate.getDate();
-    dueDate = startOfDay(
-      safeDayInMonth(cutoffActual.getFullYear(), cutoffActual.getMonth() + 1, dueDateDay)
-    );
-  }
+  const dueDate = Number.isFinite(dueDay) && dueDay > 0
+    ? startOfDay(
+        safeDayInMonth(cutoffActual.getFullYear(), cutoffActual.getMonth() + 1, dueDay)
+      )
+    : explicitDueDate
+      ? startOfDay(explicitDueDate)
+      : null;
 
   return {
     start: cycleStart,
@@ -427,6 +367,8 @@ function getCurrentCycleInfo(card: ApiCard, refDate: Date): CurrentCycleInfo {
     source: 'cutoff',
     cutoffDate: startOfDay(cutoffActual),
     dueDate,
+    nextCutoffDate,
+    isWithinPaymentWindow: dueDate ? today.getTime() <= dueDate.getTime() : true,
   };
 }
 
@@ -483,6 +425,70 @@ function isLikelyCreditCardPayment(tx: ApiTx) {
   return false;
 }
 
+function getInstallmentCycleEnd(startAtDate: Date, closingDay: number) {
+  const purchaseDate = startOfDay(startAtDate);
+  const sameMonthCutoff = safeDayInMonth(purchaseDate.getFullYear(), purchaseDate.getMonth(), closingDay);
+
+  if (purchaseDate.getTime() <= startOfDay(sameMonthCutoff).getTime()) {
+    return startOfDay(sameMonthCutoff);
+  }
+
+  return startOfDay(safeDayInMonth(purchaseDate.getFullYear(), purchaseDate.getMonth() + 1, closingDay));
+}
+
+function computeCycleExpenseDue(
+  transactions: ApiTx[],
+  currentCardId: string,
+  start: Date,
+  end: Date,
+  closingDay: number
+) {
+  return Math.max(0, transactions.reduce((sum, tx) => {
+    const txCardId = getTransactionCardId(tx);
+    if (!txCardId || txCardId !== currentCardId) return sum;
+
+    const txType = String(tx.type || '').toUpperCase();
+    if (txType !== 'EXPENSE') return sum;
+    if (isLikelyCreditCardPayment(tx)) return sum;
+
+    const amount = toNumber(tx.amount);
+    if (amount <= 0) return sum;
+
+    const rawDate = tx.occurred_at || tx.created_at || tx.date;
+    if (!rawDate) return sum;
+
+    const occurredAt = new Date(rawDate);
+    if (!Number.isFinite(occurredAt.getTime())) return sum;
+
+    const installments = (tx as any)?.metadata?.installments;
+    if (installments && typeof installments === 'object') {
+      const months = Math.trunc(toNumber((installments as any).months));
+      if (months < 2 || months > 60) return sum;
+
+      const monthlyAmount =
+        (installments as any).monthlyAmount !== undefined
+          ? toNumber((installments as any).monthlyAmount)
+          : toNumber(Number((amount / months).toFixed(2)));
+      if (monthlyAmount <= 0) return sum;
+
+      const startAtRaw = (installments as any).startAt || rawDate;
+      const startAtDate = new Date(startAtRaw);
+      if (!Number.isFinite(startAtDate.getTime())) return sum;
+
+      const firstCycleEnd = Number.isFinite(closingDay) && closingDay > 0
+        ? getInstallmentCycleEnd(startAtDate, closingDay)
+        : startOfDay(startAtDate);
+      const monthsElapsed = diffMonths(firstCycleEnd, startOfDay(end));
+      if (monthsElapsed >= 0 && monthsElapsed < months) {
+        return sum + monthlyAmount;
+      }
+      return sum;
+    }
+
+    return occurredAt >= start && occurredAt <= end ? sum + amount : sum;
+  }, 0));
+}
+
 function sumAmounts(rows: ApiTx[]) {
   return rows.reduce((sum, row) => sum + toNumber(row.amount), 0);
 }
@@ -494,6 +500,7 @@ function getTransactionCardId(tx: ApiTx) {
 }
 
 export function Dashboard() {
+  const { getAppDate } = useAppDate();
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
   const userName = useMemo(() => {
     try {
@@ -516,8 +523,8 @@ export function Dashboard() {
   const [cards, setCards] = useState<ApiCard[]>([]);
   const [period, setPeriod] = useState<Period>('month');
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
-  const [customStartDate, setCustomStartDate] = useState(() => toInputDateValue(startOfMonth(new Date())));
-  const [customEndDate, setCustomEndDate] = useState(() => toInputDateValue(new Date()));
+  const [customStartDate, setCustomStartDate] = useState(() => toInputDateValue(startOfMonth(getAppDate())));
+  const [customEndDate, setCustomEndDate] = useState(() => toInputDateValue(getAppDate()));
 
   useEffect(() => {
   let cancelled = false;
@@ -594,8 +601,8 @@ export function Dashboard() {
 }, [API_BASE]);
 
   const selectedRange = useMemo(
-    () => getDateRange(period, customStartDate, customEndDate),
-    [period, customStartDate, customEndDate]
+    () => getDateRange(period, customStartDate, customEndDate, getAppDate()),
+    [period, customStartDate, customEndDate, getAppDate]
   );
 
   const filteredTx = useMemo(() => {
@@ -797,13 +804,12 @@ export function Dashboard() {
   }, [transactions, debitCardIds]);
 
   const creditDueByCard = useMemo<CreditDueCardItem[]>(() => {
-    const today = new Date();
+    const today = getAppDate();
 
     return creditCards
       .map((card) => {
         const cardId = toId(card.id);
         const cycle = getCurrentCycleInfo(card, today);
-
         const cycleRows = transactions.filter((tx) => {
           const txCardId = getTransactionCardId(tx);
           if (!txCardId || txCardId !== cardId) return false;
@@ -823,24 +829,45 @@ export function Dashboard() {
           if (txType !== 'EXPENSE') return false;
           return isLikelyCreditCardPayment(tx);
         });
-        const expenseRows = cycleRows.filter((tx) => {
-          const isExpense = String(tx.type || '').toUpperCase() === 'EXPENSE';
-          return isExpense && !isLikelyCreditCardPayment(tx);
-        });
-
-        const dueEstimated = sumAmounts(expenseRows);
+        const cutoffDay = Math.trunc(
+          toNumber(
+            (card as any).cutoffDay ??
+            (card as any).cutoff_day ??
+            (card as any).closingDay ??
+            (card as any).closing_day
+          )
+        );
+        const dueEstimated = computeCycleExpenseDue(
+          transactions,
+          cardId,
+          cycle.start,
+          cycle.end,
+          cutoffDay
+        );
         const paidInCycle = sumAmounts(paymentRows);
         const remainingDue = Math.max(dueEstimated - paidInCycle, 0);
-        const progressPercent = dueEstimated > 0 ? Math.min((paidInCycle / dueEstimated) * 100, 100) : 0;
+        const progressPercent = dueEstimated > 0
+          ? Math.min((paidInCycle / dueEstimated) * 100, 100)
+          : 0;
         const cutoffDate = cycle.cutoffDate;
         const dueDate = cycle.dueDate;
+        const nextCutoffDate = cycle.nextCutoffDate;
         const cutoffDelta = cutoffDate ? formatDayDelta(cutoffDate, today) : null;
         const dueDelta = dueDate ? formatDayDelta(dueDate, today) : null;
+        const nextCutoffDelta = nextCutoffDate ? formatDayDelta(nextCutoffDate, today) : null;
         const isPaid = remainingDue <= 0.01;
         const isOverdue = Boolean(dueDate && dueDelta?.isPast && !isPaid);
+        const isWaitingForCutoff = !cycle.isWithinPaymentWindow && isPaid;
         const daysOverdue = isOverdue ? dueDelta?.absDays ?? 0 : 0;
         const daysUntilDue = dueDate && !dueDelta?.isPast ? dueDelta?.signedDays ?? 0 : null;
-        const isDueSoon = Boolean(dueDate && !isOverdue && !isPaid && daysUntilDue !== null && daysUntilDue <= 3);
+        const isDueSoon = Boolean(
+          !isWaitingForCutoff &&
+          dueDate &&
+          !isOverdue &&
+          !isPaid &&
+          daysUntilDue !== null &&
+          daysUntilDue <= 3
+        );
 
         return {
           cardId,
@@ -854,16 +881,25 @@ export function Dashboard() {
           source: cycle.source,
           cutoffDate,
           dueDate,
+          nextCutoffDate,
           cutoffDeltaLabel: cutoffDelta ? cutoffDelta.label : 'Not set',
           dueDeltaLabel: dueDelta ? dueDelta.label : 'Not set',
+          nextCutoffDeltaLabel: nextCutoffDelta ? nextCutoffDelta.label : 'Not set',
           isPaid,
           isOverdue,
           daysOverdue,
           isDueSoon,
           daysUntilDue,
+          isWaitingForCutoff,
         };
       })
       .sort((a, b) => {
+        if (a.isWaitingForCutoff && b.isWaitingForCutoff) {
+          return (a.nextCutoffDate?.getTime() ?? Number.MAX_SAFE_INTEGER) - (b.nextCutoffDate?.getTime() ?? Number.MAX_SAFE_INTEGER);
+        }
+        if (a.isWaitingForCutoff) return 1;
+        if (b.isWaitingForCutoff) return -1;
+
         if (a.isOverdue && b.isOverdue) return b.daysOverdue - a.daysOverdue;
         if (a.isOverdue) return -1;
         if (b.isOverdue) return 1;
@@ -874,7 +910,7 @@ export function Dashboard() {
 
         return b.remainingDue - a.remainingDue;
       });
-  }, [creditCards, transactions]);
+  }, [creditCards, transactions, getAppDate]);
 
   const totalCreditDueThisCycle = useMemo(
     () => creditDueByCard.reduce((sum, item) => sum + item.remainingDue, 0),
@@ -882,6 +918,12 @@ export function Dashboard() {
   );
 
   const netAvailable = totalDebitAvailable - totalCreditDueThisCycle;
+  const todayLabel = getAppDate().toLocaleDateString('en-US', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 
   if (loading) {
     return (
@@ -900,7 +942,7 @@ export function Dashboard() {
           <h1 className="text-3xl font-semibold text-[#1F2933] mb-2">
             {userName ? `Welcome, ${userName}` : 'Welcome'}
           </h1>
-          <p className="text-[#64748B]">Here's your financial overview for {getPeriodLabel(period).toLowerCase()}</p>
+          <p className="text-[#64748B]">Today is {todayLabel}</p>
         </div>
         <div className="dashboard-header-badges">
           <span className="dashboard-badge">{getPeriodLabel(period)}</span>
@@ -932,388 +974,37 @@ export function Dashboard() {
       </div>
 
       {activeTab === 'overview' && (
-        <>
-          {/* Available Card */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#2DD4BF] to-[#14B8A6] p-6 text-white mb-6 shadow-lg">
-            <div className="pointer-events-none absolute right-6 top-4 z-0 h-28 w-28 rounded-full bg-white/15 blur-2xl" />
-            <div className="pointer-events-none absolute bottom-3 left-10 z-0 h-20 w-40 rounded-full bg-emerald-200/15 blur-2xl" />
-            <div className="relative z-10 flex items-start justify-between">
-              <div>
-                <p className="text-white/80 mb-2">Available</p>
-                <h2 className="text-4xl lg:text-5xl font-bold">${formatMoney(totalDebitAvailable)}</h2>
-                <p className="dashboard-hero-caption">Across your debit cards</p>
-              </div>
-              <div className="dashboard-hero-icon w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                <Wallet className="w-6 h-6" />
-              </div>
-            </div>
-          </div>
-
-          {/* Balance Card */}
-          <div className="dashboard-panel bg-white rounded-2xl p-6 lg:p-8 shadow-lg mb-6">
-            <div className="mb-6">
-              <p className="text-sm font-medium text-[#64748B] mb-3">Period</p>
-              <div className="dashboard-segmented flex flex-wrap gap-2">
-                {[
-                  { value: 'month', label: 'This Month' },
-                  { value: 'week', label: 'This Week' },
-                  { value: '30days', label: 'Last 30 Days' },
-                  { value: 'year', label: 'This Year' },
-                  { value: 'custom', label: 'Custom' },
-                ].map((option) => {
-                  const isActive = period === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setPeriod(option.value as Period)}
-                      className={`dashboard-segment rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
-                        isActive ? 'dashboard-segment-active bg-[#2DD4BF] text-white' : 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {period === 'custom' && (
-                <div className="dashboard-custom-range mt-4 grid gap-3 md:grid-cols-2">
-                  <label className="block">
-                    <span className="block text-xs font-medium text-[#64748B] mb-1">Start Date</span>
-                    <input
-                      type="date"
-                      value={customStartDate}
-                      onChange={(e) => setCustomStartDate(e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#1F2933] outline-none transition-colors focus:border-[#2DD4BF]"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="block text-xs font-medium text-[#64748B] mb-1">End Date</span>
-                    <input
-                      type="date"
-                      value={customEndDate}
-                      onChange={(e) => setCustomEndDate(e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#1F2933] outline-none transition-colors focus:border-[#2DD4BF]"
-                    />
-                  </label>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <p className="text-[#64748B] mb-2">Total Balance</p>
-                <h2 className="text-4xl lg:text-5xl font-bold text-[#1F2933]">${formatMoney(balance)}</h2>
-              </div>
-              <div className="dashboard-balance-icon w-12 h-12 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-[#64748B]" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="dashboard-metric-tile dashboard-metric-income rounded-xl border p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <ArrowUpRight className="w-4 h-4 text-emerald-600" />
-                  <span className="dashboard-metric-label dashboard-metric-label-income text-sm">Income</span>
-                </div>
-                <p className="text-2xl font-semibold text-[#1F2933]">${formatMoney(income)}</p>
-              </div>
-
-              <div className="dashboard-metric-tile dashboard-metric-expense rounded-xl border p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <ArrowDownRight className="w-4 h-4 text-rose-600" />
-                  <span className="dashboard-metric-label dashboard-metric-label-expense text-sm">Expenses</span>
-                </div>
-                <p className="text-2xl font-semibold text-[#1F2933]">${formatMoney(expenses)}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-6 mb-6">
-            {/* Spending Overview */}
-            <div className="dashboard-panel dashboard-panel-muted bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h3 className="text-lg font-semibold text-[#1F2933] mb-4">Spending {getPeriodLabel(period)}</h3>
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={chartData} margin={{ top: 24, right: 8, left: 8, bottom: 0 }}>
-                  <XAxis
-                    dataKey="day"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#64748B', fontSize: 12 }}
-                  />
-                  <Bar dataKey="amount" fill="#2DD4BF" radius={[8, 8, 0, 0]}>
-                    <LabelList
-                      dataKey="amount"
-                      content={renderBarAmountLabel}
-                    />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-sm text-[#64748B]">Total spent</span>
-                <span className="text-sm font-semibold text-[#1F2933]">${formatMoney(expenses)}</span>
-              </div>
-              <div className="mt-5 border-t border-gray-100 pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-semibold text-[#1F2933]">Spending by Category</span>
-                  <span className="text-xs text-[#64748B]">{getPeriodLabel(period)}</span>
-                </div>
-                {spendingByCategory.length > 0 ? (
-                  <div className="space-y-3">
-                    {spendingByCategory.map((item) => {
-                      const width = topCategoryAmount > 0 ? (item.amount / topCategoryAmount) * 100 : 0;
-                      return (
-                        <div key={item.name}>
-                          <div className="flex items-center justify-between gap-3 mb-1">
-                            <span className="text-sm text-[#1F2933] truncate">{item.name}</span>
-                            <span className="text-sm font-medium text-[#1F2933]">${formatMoney(item.amount)}</span>
-                          </div>
-                          <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-[#2DD4BF] transition-all"
-                              style={{ width: `${Math.min(Math.max(width, 0), 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-sm text-[#64748B]">No expense activity in this period.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Credit Cards Summary */}
-            <div className="dashboard-panel dashboard-panel-muted bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-[#1F2933]">Credit Cards</h3>
-                <Link to="/cards" className="text-sm text-[#2DD4BF] hover:text-[#14B8A6]">
-                  View all
-                </Link>
-              </div>
-              <div className="mb-4">
-                <div className="flex items-baseline gap-2 mb-2">
-                  <span className="text-3xl font-bold text-[#1F2933]">${formatMoney(totalCreditUsed)}</span>
-                  <span className="text-[#64748B]">/ ${formatMoney(totalCreditLimit)}</span>
-                </div>
-                <p className="text-sm text-[#64748B]">Total credit used</p>
-              </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-4">
-                <div
-                  className={`h-full rounded-full transition-all dashboard-credit-progress ${
-                    creditUsagePercent > 80 ? 'bg-[#FACC15]' : 'bg-[#3B82F6]'
-                  }`}
-                  style={{ width: `${Math.min(creditUsagePercent, 100)}%` }}
-                />
-              </div>
-              <div className="flex gap-2">
-                {creditCards.slice(0, 3).map((card) => (
-                  <div
-                    key={card.id}
-                    className={`dashboard-mini-card flex-1 h-16 rounded-xl bg-gradient-to-br ${cardColorToGradient(card.color)} p-3 flex flex-col justify-between`}
-                  >
-                    <span className="text-xs text-white/80">{"\u2022\u2022\u2022\u2022"} {card.last4 ?? '----'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Recent Transactions */}
-          <div className="dashboard-panel dashboard-panel-muted bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-[#1F2933]">Recent Transactions</h3>
-              <Link to="/transactions" className="text-sm text-[#2DD4BF] hover:text-[#14B8A6]">
-                  View all
-              </Link>
-            </div>
-            <div className="space-y-3">
-              {recentUi.length > 0 ? (
-                recentUi.map((t) => (
-                  <div key={t.id} className="dashboard-transaction-row flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`dashboard-transaction-icon w-10 h-10 rounded-xl flex items-center justify-center ${
-                          t.type === 'income' ? 'bg-green-50' : 'bg-red-50'
-                        }`}
-                      >
-                        {t.type === 'income' ? (
-                          <ArrowUpRight className="w-5 h-5 text-green-600" />
-                        ) : (
-                          <ArrowDownRight className="w-5 h-5 text-red-600" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium text-[#1F2933]">{t.description ?? "\u2014"}</p>
-                        <p className="text-sm text-[#64748B]">
-                          {t.category || 'Uncategorized'}
-                        </p>
-                      </div>
-                    </div>
-                    <span
-                      className={`font-semibold ${
-                        t.type === 'income' ? 'text-green-600' : 'text-[#1F2933]'
-                      }`}
-                    >
-                      {t.type === 'income' ? '+' : '-'}${formatMoney(t.amount)}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="py-3 text-sm text-[#64748B]">No transactions found in this period.</p>
-              )}
-            </div>
-          </div>
-        </>
+        <DashboardOverview
+          totalDebitAvailable={totalDebitAvailable}
+          period={period}
+          periodLabel={getPeriodLabel(period)}
+          onPeriodChange={(nextPeriod) => setPeriod(nextPeriod as Period)}
+          customStartDate={customStartDate}
+          customEndDate={customEndDate}
+          onCustomStartDateChange={setCustomStartDate}
+          onCustomEndDateChange={setCustomEndDate}
+          balance={balance}
+          income={income}
+          expenses={expenses}
+          chartData={chartData}
+          spendingByCategory={spendingByCategory}
+          topCategoryAmount={topCategoryAmount}
+          totalCreditUsed={totalCreditUsed}
+          totalCreditLimit={totalCreditLimit}
+          creditUsagePercent={creditUsagePercent}
+          creditCards={creditCards}
+          cardColorToGradient={cardColorToGradient}
+          recentUi={recentUi}
+        />
       )}
 
       {activeTab === 'net' && (
-        <>
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0F172A] to-[#1E3A8A] p-6 text-white mb-6 shadow-lg">
-            <div className="pointer-events-none absolute right-8 top-5 z-0 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
-            <div className="relative z-10 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-white/75 mb-2">Net Available</p>
-                <h2 className="text-4xl lg:text-5xl font-bold">${formatMoney(netAvailable)}</h2>
-                <p className="mt-2 text-sm text-white/75">Debit Available − Credit Due (This Cycle)</p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10">
-                <Wallet className="h-6 w-6" />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 mb-6">
-            <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-              <p className="text-sm font-medium text-[#64748B] mb-2">Debit Available</p>
-              <p className="text-3xl font-bold text-[#1F2933]">${formatMoney(totalDebitAvailable)}</p>
-            </div>
-            <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-              <p className="text-sm font-medium text-[#64748B] mb-2">Credit Due This Cycle</p>
-              <p className="text-3xl font-bold text-[#1F2933]">${formatMoney(totalCreditDueThisCycle)}</p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <div className="mb-5 flex items-center justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-[#1F2933]">Credit Due by Card</h3>
-                <p className="text-sm text-[#64748B]">Current cycle estimate per credit card.</p>
-              </div>
-              <Link to="/cards" className="text-sm text-[#2DD4BF] hover:text-[#14B8A6]">
-                View all
-              </Link>
-            </div>
-
-            {creditDueByCard.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-[#64748B]">
-                No credit cards found
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {creditDueByCard.map((item) => {
-                  const isSettled = item.remainingDue <= 0;
-
-                  return (
-                    <div
-                      key={item.cardId}
-                      className={`rounded-2xl border p-5 transition-colors ${
-                        isSettled
-                          ? 'border-gray-100 bg-gray-50/80 opacity-80'
-                          : 'border-gray-100 bg-white'
-                      }`}
-                    >
-                      {item.isOverdue && (
-                        <div className="mb-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-xs font-bold">!</span>
-                          <span>Tu limite de pago fue hace {item.daysOverdue} dia{item.daysOverdue === 1 ? '' : 's'}</span>
-                        </div>
-                      )}
-                      {!item.isOverdue && item.isDueSoon && item.daysUntilDue !== null && (
-                        <div className="mb-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-xs font-bold">!</span>
-                          <span>Tu limite de pago es en {item.daysUntilDue} dia{item.daysUntilDue === 1 ? '' : 's'}</span>
-                        </div>
-                      )}
-
-                      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${item.colorClass}`}>
-                            <span className="text-xs font-semibold text-white">••••</span>
-                          </div>
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-semibold text-[#1F2933]">{item.name}</p>
-                              <span
-                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                  item.isPaid
-                                    ? 'bg-emerald-50 text-emerald-700'
-                                    : item.isOverdue
-                                      ? 'bg-rose-50 text-rose-700'
-                                      : 'bg-amber-50 text-amber-700'
-                                }`}
-                              >
-                                {item.isPaid ? 'Paid' : 'Not paid'}
-                              </span>
-                            </div>
-                            <p className="text-sm text-[#64748B]">{item.cycleLabel}</p>
-                            <div className="mt-1 space-y-1 text-xs text-[#64748B]">
-                              <p>Cutoff: {item.cutoffDeltaLabel}</p>
-                              <p>Due: {item.dueDeltaLabel}</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-left lg:text-right">
-                          <p className="text-xs font-medium uppercase tracking-wide text-[#94A3B8]">
-                            {item.source === 'fallback' ? 'Fallback Estimate' : 'Current Cycle'}
-                          </p>
-                          <p className={`text-sm font-semibold ${isSettled ? 'text-slate-500' : 'text-[#1F2933]'}`}>
-                            Remaining: ${formatMoney(item.remainingDue)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <p className="text-xs font-medium text-[#64748B] mb-1">Due (estimated)</p>
-                          <p className="text-base font-semibold text-[#1F2933]">${formatMoney(item.dueEstimated)}</p>
-                        </div>
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <p className="text-xs font-medium text-[#64748B] mb-1">Paid in cycle</p>
-                          <p className="text-base font-semibold text-[#1F2933]">${formatMoney(item.paidInCycle)}</p>
-                        </div>
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <p className="text-xs font-medium text-[#64748B] mb-1">Remaining</p>
-                          <p className={`text-base font-semibold ${isSettled ? 'text-slate-500' : 'text-[#1F2933]'}`}>
-                            ${formatMoney(item.remainingDue)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-4">
-                        <div className="mb-2 flex items-center justify-between text-xs">
-                          <span className="text-[#64748B]">Payment progress</span>
-                          <span className={isSettled ? 'text-slate-500' : 'text-[#1F2933]'}>
-                            {item.dueEstimated > 0 ? `${item.progressPercent.toFixed(0)}%` : '0%'}
-                          </span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              isSettled ? 'bg-slate-300' : 'bg-[#2DD4BF]'
-                            }`}
-                            style={{ width: `${Math.min(Math.max(item.progressPercent, 0), 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </>
+        <DashboardNetAvailable
+          netAvailable={netAvailable}
+          totalDebitAvailable={totalDebitAvailable}
+          totalCreditDueThisCycle={totalCreditDueThisCycle}
+          creditDueByCard={creditDueByCard}
+        />
       )}
     </div>
   );
