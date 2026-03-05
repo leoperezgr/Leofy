@@ -50,11 +50,20 @@ export function Layout() {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const navItems = [
+  const sidebarNavItems = [
     { path: '/', icon: Home, label: 'Home' },
     { path: '/transactions', icon: Receipt, label: 'Transactions' },
     { path: '/cards', icon: CreditCard, label: 'Credit Cards' },
     { path: '/debit-cards', icon: Wallet, label: 'Debit Cards' },
+    { path: '/statistics', icon: BarChart3, label: 'Stats' },
+    { path: '/settings', icon: Settings, label: 'Settings' },
+    ...(isTester ? [{ path: '/tester', icon: FlaskConical, label: 'Tester' }] : []),
+  ];
+
+  const mobileNavItems = [
+    { path: '/', icon: Home, label: 'Home' },
+    { path: '/transactions', icon: Receipt, label: 'Txns' },
+    { path: '/cards', icon: CreditCard, label: 'Cards' },
     { path: '/statistics', icon: BarChart3, label: 'Stats' },
     { path: '/settings', icon: Settings, label: 'Settings' },
     ...(isTester ? [{ path: '/tester', icon: FlaskConical, label: 'Tester' }] : []),
@@ -74,7 +83,7 @@ export function Layout() {
         </div>
 
         <nav className="layout-nav">
-          {navItems.map((item) => {
+          {sidebarNavItems.map((item) => {
             const Icon = item.icon;
             return (
               <Link
@@ -123,14 +132,17 @@ export function Layout() {
       {/* Mobile Bottom Navigation */}
       <nav className="layout-mobile-nav">
         <div className="layout-mobile-nav-inner">
-          {navItems.map((item) => {
+          {mobileNavItems.map((item) => {
             const Icon = item.icon;
+            const active = item.path === '/cards'
+              ? location.pathname === '/cards' || location.pathname === '/debit-cards'
+              : isActive(item.path);
             return (
               <Link
                 key={item.path}
                 to={item.path}
                 className={`layout-mobile-link ${
-                  isActive(item.path)
+                  active
                     ? 'layout-mobile-link-active'
                     : 'layout-mobile-link-inactive'
                 }`}
@@ -144,12 +156,14 @@ export function Layout() {
       </nav>
 
       {/* Floating Action Button - Mobile */}
-      <button
-        onClick={() => setShowAddTransaction(true)}
-        className="layout-mobile-fab"
-      >
-        <Plus className="layout-mobile-fab-icon" />
-      </button>
+      {!showAddTransaction && (
+        <button
+          onClick={() => setShowAddTransaction(true)}
+          className="layout-mobile-fab"
+        >
+          <Plus className="layout-mobile-fab-icon" />
+        </button>
+      )}
 
       {/* Add Transaction Modal */}
       <AddTransactionModal

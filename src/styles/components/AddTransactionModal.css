@@ -24,6 +24,14 @@
   border-radius: 1.5rem;
   background: #fff;
   padding: 1.5rem;
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 640px) {
+  .atm-modal {
+    max-height: 85vh;
+    padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 .atm-header {

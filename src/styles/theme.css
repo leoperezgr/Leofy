@@ -33,6 +33,25 @@
   --chart-4: #EC4899;
   --chart-5: #F59E0B;
   --radius: 0.75rem;
+
+  /* Dashboard design tokens */
+  --db-shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  --db-shadow-card-hover: 0 4px 12px rgba(0,0,0,0.08);
+  --db-shadow-hero: 0 8px 32px rgba(45, 212, 191, 0.12);
+  --db-radius-card: 1rem;
+  --db-radius-sm: 0.5rem;
+  --db-pad-card: 1.5rem;
+  --db-pad-section: 1.5rem;
+  --db-pad-inner: 0.75rem;
+  --db-gap-section: 1.5rem;
+  --db-gap-card: 1rem;
+  --db-text-title: 1.5rem;
+  --db-text-section: 1rem;
+  --db-text-label: 0.75rem;
+  --db-text-amount-lg: 2.25rem;
+  --db-text-amount-md: 1.5rem;
+  --db-text-amount-sm: 1rem;
+  --db-text-body: 0.875rem;
   --sidebar: #ffffff;
   --sidebar-foreground: #1F2933;
   --sidebar-primary: #2DD4BF;

@@ -585,7 +585,7 @@ export function CreditCardDetail() {
                       </div>
                        <div className="cd-transaction-main">
                          <p className="cd-transaction-description">{transaction.description}</p>
-                         <p className="cd-transaction-category">{transaction.category}</p>
+                         <p className="cd-transaction-category">{transaction.type === "income" ? "Credit Payment" : transaction.category}</p>
                          {transaction.installments && (
                            <div className="cd-installment-row">
                              <span className="cd-installment-chip">Installments</span>
@@ -603,7 +603,7 @@ export function CreditCardDetail() {
                        </div>
                     </div>
                     <div className="cd-transaction-right">
-                      <p className="cd-transaction-amount">
+                      <p className={`cd-transaction-amount ${transaction.type === "income" ? "cd-transaction-amount-income" : ""}`}>
                         {transaction.type === "income" ? "+" : "-"}${formatMoney(transaction.amount)}
                       </p>
                       <p className="cd-transaction-date">

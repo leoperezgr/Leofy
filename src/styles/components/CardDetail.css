@@ -471,6 +471,10 @@
   font-weight: 600;
 }
 
+.cd-transaction-amount-income {
+  color: #10b981;
+}
+
 .cd-transaction-date {
   color: #94a3b8;
   font-size: 0.75rem;
