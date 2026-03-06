@@ -65,7 +65,7 @@ Leofy/
 │   │   │   ├── DashboardSafeToSpend.tsx  # Safe to Spend tab: net available minus current cycle charges
 │   │   │   ├── Login.tsx          # Email/password login
 │   │   │   ├── Onboarding.tsx     # First-time setup flow
-│   │   │   ├── Transactions.tsx   # Transaction list with filters
+│   │   │   ├── Transactions.tsx   # Transaction list with filters, premium fintech design
 │   │   │   ├── TransactionDetail.tsx  # Edit single transaction
 │   │   │   ├── TransferDetail.tsx # View/edit individual transfers
 │   │   │   ├── AddTransactionModal.tsx # Create income/expense/transfer
@@ -224,7 +224,7 @@ Transfer rules: Only from debit accounts. Creates 2 linked transactions (EXPENSE
 - `getInstallmentsInfo(tx, refDate, closingDay?)`: calculates currentMonth, remainingMonths, monthlyAmount
 - `getInstallmentCycleEnd(startAt, closingDay)`: determines which billing cycle the first installment falls into
 - Dashboard counts which month the user is in based on `startAt`
-- Transactions list shows "X of Y months paid"
+- Transactions list shows MSI chip with visual progress bar
 
 ### Transfers
 - Creates paired EXPENSE + INCOME transactions linked by `transfer_id` (UUID)
@@ -235,9 +235,10 @@ Transfer rules: Only from debit accounts. Creates 2 linked transactions (EXPENSE
 
 ### Safe to Spend
 - Third Dashboard tab: calculates how much the user can safely spend
-- Formula: `safeToSpend = netAvailable - totalCurrentCycleAmount`
-- `netAvailable`: total debit balances minus credit card dues (from Net Available tab)
-- `totalCurrentCycleAmount`: sum of all credit card current cycle charges
+- Formula: `safeToSpend = totalDebitAvailable - totalPastCycleRemaining - totalCurrentCycleAmount`
+- `totalDebitAvailable`: sum of all debit account balances (INCOME - EXPENSE per debit card)
+- `totalPastCycleRemaining`: sum of past cycle remaining amounts across all credit cards (from `computeThreeCycleAmounts`)
+- `totalCurrentCycleAmount`: sum of current cycle remaining amounts across all credit cards (from `computeThreeCycleAmounts`)
 - Shows per-card breakdown with cycle progress, last statement remaining, and total balance
 
 ### Payment Methods
@@ -271,6 +272,22 @@ Transfer rules: Only from debit accounts. Creates 2 linked transactions (EXPENSE
 
 ### Card Color Gradients
 RED, ORANGE, BLUE, GOLD, BLACK, PLATINUM, SILVER, PURPLE, GREEN, OTHER (default teal)
+
+### Transactions Page Design
+- **Premium fintech aesthetic** (Revolut/Copilot/Monarch style)
+- **Row hierarchy**: Category as primary text (600 weight), description as muted secondary, amounts as display font (800 weight, 1.25rem mobile / 1.375rem desktop)
+- **Type differentiation**: Colored left border per row — income (#10B981), expense (#EF4444), transfer (#3B82F6), credit payment (#8B5CF6)
+- **Icon wraps**: 2.5rem with semi-transparent colored backgrounds matching type
+- **Payment badges**: Pill badges showing Cash/Debit/Credit method per transaction
+- **Card name badges**: Color-coded by card color enum (`tx-card-badge--RED`, `--BLUE`, etc.)
+- **Filter tabs**: Pill-style with teal active state, not underline tabs
+- **Staggered animation**: Rows fade-in with incremental delay (30ms per item)
+- **Sticky date headers**: Uppercase, backdrop-blur, `width: fit-content`
+- **Installments**: MSI chip + visual progress bar + remaining info
+- **Transfers**: Dedicated badge + arrow between card names
+- **Empty descriptions**: Hidden (not rendered) when falsy or "-"
+- **UiTransactionRow** includes `cardColor?: string` mapped from card's `color` field
+- **Long-press**: Premium sheen animation + float effect for mobile edit
 
 ### CSS Approach
 - Component-specific CSS files in `src/styles/components/` matching component name
