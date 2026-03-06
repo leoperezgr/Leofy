@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Search, Pencil, LayoutGrid } from "lucide-react";
+import { Search, Pencil, LayoutGrid, ArrowRight, Receipt } from "lucide-react";
 import { getCategoryIcon, categories as mockCategories } from "../utils/mockData";
 import { UiTransaction, normalizeTransactions } from "../utils/transactionsMapper";
 import * as LucideIcons from "lucide-react";
@@ -22,6 +22,7 @@ type UiTransactionRow = UiTransaction & {
   kind: "transaction";
   cardName?: string;
   cardId?: string;
+  cardColor?: string;
   categoryIcon?: string;
   installments?: InstallmentsInfo;
 };
@@ -100,8 +101,11 @@ const toNumber = (value: unknown) => {
 const dateToDay = (value: string | null | undefined) => {
   const source = value || new Date().toISOString();
   const parsed = new Date(source);
-  if (Number.isNaN(parsed.getTime())) return new Date().toISOString().split("T")[0];
-  return parsed.toISOString().split("T")[0];
+  if (Number.isNaN(parsed.getTime())) {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  }
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
 };
 
 const getInstallmentsInfo = (row: any, referenceDate: Date): InstallmentsInfo | null => {
@@ -163,13 +167,11 @@ function getIconNameForRow(row: ListRow): string {
     return "CircleDollarSign";
   }
 
-  // Use DEFAULT_EXPENSE_CATEGORIES for exact match first
   const defaultMatch = DEFAULT_EXPENSE_CATEGORIES.find(
     (c) => c.name.toLowerCase() === cat
   );
   if (defaultMatch) return defaultMatch.icon;
 
-  // Use getCategoryIconName (keyword-based) from SettingsCategories
   const settingsIcon = getCategoryIconName(row.category);
   if (settingsIcon !== "Tag") return settingsIcon;
 
@@ -197,10 +199,40 @@ function getSortKey(row: ListRow) {
   return row.id;
 }
 
-function getDestinationLabel(row: TransferListRow) {
-  return row.toCardIsCredit
-    ? `Credit Payment to ${row.toCardName} from ${row.fromCardName}`
-    : `From ${row.fromCardName} -> ${row.toCardName}`;
+function getRowTypeClass(row: ListRow): string {
+  if (isTransferRow(row)) {
+    return row.toCardIsCredit ? "tx-row--credit-payment" : "tx-row--transfer";
+  }
+  return row.type === "income" ? "tx-row--income" : "tx-row--expense";
+}
+
+function getIconWrapClass(row: ListRow): string {
+  if (isTransferRow(row)) {
+    return row.toCardIsCredit ? "tx-icon-wrap-credit-payment" : "tx-icon-wrap-transfer";
+  }
+  return row.type === "income" ? "tx-icon-wrap-income" : "tx-icon-wrap-expense";
+}
+
+function getIconClass(row: ListRow): string {
+  if (isTransferRow(row)) {
+    return row.toCardIsCredit ? "tx-icon-credit-payment" : "tx-icon-transfer";
+  }
+  return row.type === "income" ? "tx-icon-income" : "tx-icon-expense";
+}
+
+function getAmountClass(row: ListRow): string {
+  if (isTransferRow(row)) {
+    return row.toCardIsCredit ? "tx-amount-credit-payment" : "tx-amount-transfer";
+  }
+  return row.type === "income" ? "tx-amount-income" : "tx-amount-expense";
+}
+
+function getPaymentBadgeClass(method: string): string {
+  switch (method) {
+    case "credit": return "tx-badge--credit";
+    case "debit": return "tx-badge--debit";
+    default: return "tx-badge--cash";
+  }
 }
 
 export function Transactions() {
@@ -308,6 +340,7 @@ export function Transactions() {
         const cardMethodById = new Map<string, string>();
         const cardNameById = new Map<string, string>();
         const cardIsCreditById = new Map<string, boolean>();
+        const cardColorById = new Map<string, string>();
         for (const card of cardsList) {
           if (!card?.id) continue;
           const cardId = String(card.id);
@@ -315,11 +348,13 @@ export function Transactions() {
           cardMethodById.set(cardId, isCredit ? "credit" : "debit");
           cardNameById.set(cardId, card?.name ? String(card.name) : `Card ${cardId}`);
           cardIsCreditById.set(cardId, isCredit);
+          if (card?.color) cardColorById.set(cardId, String(card.color));
         }
 
         const paymentById = new Map<string, string>();
         const cardNameByTxId = new Map<string, string>();
         const cardIdByTxId = new Map<string, string>();
+        const cardColorByTxId = new Map<string, string>();
         const installmentsByTxId = new Map<string, InstallmentsInfo>();
         const metaIconByTxId = new Map<string, string>();
         for (const row of rawList) {
@@ -334,6 +369,8 @@ export function Transactions() {
             cardIdByTxId.set(txId, String(cardId));
             const cardName = cardNameById.get(String(cardId));
             if (cardName) cardNameByTxId.set(txId, cardName);
+            const cardColor = cardColorById.get(String(cardId));
+            if (cardColor) cardColorByTxId.set(txId, cardColor);
           }
           const installmentsInfo = getInstallmentsInfo(row, referenceDate);
           if (installmentsInfo) installmentsByTxId.set(txId, installmentsInfo);
@@ -352,6 +389,7 @@ export function Transactions() {
             paymentMethod: paymentById.get(String(tx.id)) || tx.paymentMethod || "cash",
             cardName: cardNameByTxId.get(String(tx.id)),
             cardId: cardIdByTxId.get(String(tx.id)),
+            cardColor: cardColorByTxId.get(String(tx.id)),
             installments: installmentsByTxId.get(String(tx.id)),
           };
           normalizedById.set(String(tx.id), row);
@@ -416,8 +454,53 @@ export function Transactions() {
           });
         }
 
+        // Fallback: detect legacy cash transfers without transfer_id
+        // These are single INCOME transactions with transferRole=incoming and no transfer_id
+        const legacyTransferRows: TransferListRow[] = [];
+        for (const row of rawList) {
+          if (!row?.id) continue;
+          const txId = String(row.id);
+          if (consumedIds.has(txId)) continue;
+
+          const transferIdVal = String(row?.transfer_id ?? row?.transferId ?? "").trim();
+          if (transferIdVal) continue; // already handled above
+
+          const meta = row?.metadata;
+          if (!meta || typeof meta !== "object") continue;
+
+          const transferRole = String(meta.transferRole || "").toLowerCase();
+          const catName = String(meta.category_name || row?.category || "").toLowerCase();
+
+          if (transferRole !== "incoming" || catName !== "transfer") continue;
+
+          const normalized = normalizedById.get(txId);
+          if (!normalized) continue;
+
+          consumedIds.add(txId);
+
+          const toId = String(meta.toCardId || row?.card_id || row?.cardId || "").trim();
+          const fromId = String(meta.fromCardId || "").trim();
+          const toCardIsCredit = Boolean(cardIsCreditById.get(toId));
+
+          legacyTransferRows.push({
+            kind: "transfer",
+            id: txId,
+            transferId: `legacy-${txId}`,
+            amount: normalized.amount,
+            description: normalized.description || "Cash Transfer",
+            category: "Transfer",
+            date: normalized.date || dateToDay(row?.occurred_at),
+            fromCardId: fromId || "cash",
+            toCardId: toId,
+            fromCardName: fromId ? (cardNameById.get(fromId) || "Unknown") : "Cash",
+            toCardName: cardNameById.get(toId) || "Unknown account",
+            toCardIsCredit,
+            section: toCardIsCredit ? "credit_payment" : "all",
+          });
+        }
+
         const nonTransferRows = normalizedTransactions.filter((row) => !consumedIds.has(String(row.id)));
-        const nextItems: ListRow[] = [...nonTransferRows, ...transferRows];
+        const nextItems: ListRow[] = [...nonTransferRows, ...transferRows, ...legacyTransferRows];
 
         if (!cancelled) setItems(nextItems);
       } catch (e) {
@@ -519,11 +602,15 @@ export function Transactions() {
     return <LoadingScreen title="Transactions" message="Loading your latest movements..." />;
   }
 
+  let globalRowIndex = 0;
+
   return (
     <div className="tx-page">
       <div className="tx-header">
-        <h1 className="tx-title">Transactions</h1>
-        <p className="tx-subtitle">Track all your income, expenses, and card payments</p>
+        <div>
+          <h1 className="tx-title">Transactions</h1>
+          <p className="tx-subtitle">Track all your income, expenses, and card payments</p>
+        </div>
       </div>
 
       <div className="tx-toolbar">
@@ -538,32 +625,30 @@ export function Transactions() {
           />
         </div>
 
-        <div className="tx-filter-row">
+        <div className="tx-tabs">
           <button
             onClick={() => setFilter("all")}
-            className={`tx-filter-btn ${filter === "all" ? "tx-filter-btn-all-active" : "tx-filter-btn-inactive"}`}
+            className={`tx-tab ${filter === "all" ? "tx-tab--active" : ""}`}
           >
             All
           </button>
           <button
             onClick={() => setFilter("income")}
-            className={`tx-filter-btn ${filter === "income" ? "tx-filter-btn-income-active" : "tx-filter-btn-inactive"}`}
+            className={`tx-tab ${filter === "income" ? "tx-tab--active" : ""}`}
           >
             Income
           </button>
           <button
             onClick={() => setFilter("expense")}
-            className={`tx-filter-btn ${filter === "expense" ? "tx-filter-btn-expense-active" : "tx-filter-btn-inactive"}`}
+            className={`tx-tab ${filter === "expense" ? "tx-tab--active" : ""}`}
           >
             Expenses
           </button>
           <button
             onClick={() => setFilter("credit_payment")}
-            className={`tx-filter-btn ${
-              filter === "credit_payment" ? "tx-filter-btn-credit-payment-active" : "tx-filter-btn-inactive"
-            }`}
+            className={`tx-tab ${filter === "credit_payment" ? "tx-tab--active" : ""}`}
           >
-            Credit Payment
+            Credit Payments
           </button>
         </div>
       </div>
@@ -589,58 +674,85 @@ export function Transactions() {
                     ? `/transactions/transfers/${transaction.transferId}`
                     : `/transactions/${transaction.id}`;
 
+                  const staggerDelay = Math.min(globalRowIndex * 0.03, 0.6);
+                  globalRowIndex++;
+
                   return (
                     <div
                       key={rowId}
-                      className={`group tx-row ${mobileEditTxId === rowId ? "tx-row-selected" : ""} ${
+                      className={`group tx-row ${getRowTypeClass(transaction)} ${mobileEditTxId === rowId ? "tx-row-selected" : ""} ${
                         index !== dayTransactions.length - 1 ? "tx-row-divider" : ""
                       }`}
+                      style={{ animationDelay: `${staggerDelay}s` }}
                       onTouchStart={() => handleRowTouchStart(rowId)}
                       onTouchEnd={handleRowTouchEnd}
                       onTouchCancel={handleRowTouchEnd}
                       onTouchMove={handleRowTouchEnd}
                     >
                       <div className="tx-row-left">
-                        <div
-                          className={`tx-icon-wrap ${
-                            !isTransferRow(transaction) && transaction.type === "income"
-                              ? "tx-icon-wrap-income"
-                              : "tx-icon-wrap-expense"
-                          }`}
-                        >
-                          <IconComponent
-                            className={`tx-icon ${
-                              !isTransferRow(transaction) && transaction.type === "income"
-                                ? "tx-icon-income"
-                                : "tx-icon-expense"
-                            }`}
-                          />
+                        <div className={`tx-icon-wrap ${getIconWrapClass(transaction)}`}>
+                          <IconComponent className={`tx-icon ${getIconClass(transaction)}`} />
                         </div>
 
                         <div className="tx-main">
-                          <p className="tx-description">{transaction.description || "-"}</p>
+                          <p className="tx-category">{transaction.category}</p>
+                          {(() => {
+                            const desc = isTransferRow(transaction)
+                              ? transaction.description
+                              : (transaction.description && transaction.description !== "-" ? transaction.description : "");
+                            return desc ? <p className="tx-description">{desc}</p> : null;
+                          })()}
                           <div className="tx-meta-row">
-                            <span className="tx-meta-text">{transaction.category}</span>
-                            <span className="tx-dot">|</span>
-                            <span className={`tx-meta-text ${isTransferRow(transaction) ? "" : "tx-meta-capitalize"}`}>
-                              {isTransferRow(transaction)
-                                ? getDestinationLabel(transaction)
-                                : transaction.paymentMethod === "cash"
-                                  ? "Cash"
-                                  : transaction.cardName || transaction.paymentMethod}
-                            </span>
+                            {isTransferRow(transaction) ? (
+                              <>
+                                <span className={`tx-badge ${transaction.toCardIsCredit ? "tx-badge--credit-pay" : "tx-badge--transfer"}`}>
+                                  {transaction.toCardIsCredit ? "Credit Pay" : "Transfer"}
+                                </span>
+                                <span className="tx-transfer-label">
+                                  {transaction.fromCardName}
+                                  <ArrowRight size={10} className="tx-transfer-arrow" />
+                                  {transaction.toCardName}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className={`tx-badge ${getPaymentBadgeClass(transaction.paymentMethod)}`}>
+                                  {transaction.paymentMethod === "cash"
+                                    ? "Cash"
+                                    : transaction.paymentMethod === "credit"
+                                      ? "Credit"
+                                      : "Debit"}
+                                </span>
+                                {transaction.cardName && (
+                                  <>
+                                    <span className="tx-dot">&middot;</span>
+                                    <span className={`tx-card-badge tx-card-badge--${transaction.cardColor || "OTHER"}`}>{transaction.cardName}</span>
+                                  </>
+                                )}
+                              </>
+                            )}
                           </div>
                           {!isTransferRow(transaction) && transaction.installments && (
                             <div className="tx-installment-row">
-                              <span className="tx-installment-chip">Installments</span>
+                              <span className="tx-installment-chip">
+                                MSI {transaction.installments.currentMonth}/{transaction.installments.months}
+                              </span>
+                              <div className="tx-installment-progress">
+                                <div className="tx-installment-bar">
+                                  <div
+                                    className="tx-installment-bar-fill"
+                                    style={{
+                                      width: `${(transaction.installments.currentMonth / transaction.installments.months) * 100}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
                               <span className="tx-installment-info">
-                                {transaction.installments.currentMonth}/{transaction.installments.months}
-                                {" \u2022 "}
                                 ${formatMoney(transaction.installments.monthlyAmount)}/mo
                                 {" \u2022 "}
                                 {transaction.installments.remainingMonths > 0
                                   ? `${transaction.installments.remainingMonths} left`
-                                  : "Completed"}
+                                  : "Done"}
                               </span>
                             </div>
                           )}
@@ -648,13 +760,7 @@ export function Transactions() {
                       </div>
 
                       <div className="tx-right">
-                        <p
-                          className={`tx-amount ${
-                            !isTransferRow(transaction) && transaction.type === "income"
-                              ? "tx-amount-income"
-                              : "tx-amount-expense"
-                          }`}
-                        >
+                        <p className={`tx-amount ${getAmountClass(transaction)}`}>
                           {isTransferRow(transaction) ? "$" : transaction.type === "income" ? "+$" : "-$"}
                           {formatMoney(transaction.amount)}
                         </p>
@@ -706,7 +812,9 @@ export function Transactions() {
 
         {filteredTransactions.length === 0 && (
           <div className="tx-state-box">
+            <Receipt className="tx-empty-icon" />
             <p className="tx-muted">No transactions found</p>
+            <p className="tx-muted-sub">Try adjusting your search or filters</p>
           </div>
         )}
       </>

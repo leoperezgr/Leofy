@@ -44,6 +44,7 @@ const DEFAULT_EXPENSE_CATEGORIES: UiCategory[] = [
 ];
 
 const CATEGORY_STORAGE_KEY = 'leofy_settings_categories_v1';
+const APP_DATE_OVERRIDE_KEY = 'leofy_app_date_override';
 
 const DEFAULT_INCOME_CATEGORIES: UiCategory[] = mockCategories
   .filter((cat) => cat.type === 'income')
@@ -178,6 +179,16 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
   };
 
   const round2 = (n: number) => Math.round(n * 100) / 100;
+
+  const getTransactionDateIso = () => {
+    if (typeof window === 'undefined') return undefined;
+    const rawOverride = window.localStorage.getItem(APP_DATE_OVERRIDE_KEY);
+    if (!rawOverride) return undefined;
+
+    const parsed = new Date(rawOverride);
+    if (!Number.isFinite(parsed.getTime())) return undefined;
+    return parsed.toISOString();
+  };
 
   const authHeaders = (): Headers => {
     const token = localStorage.getItem('leofy_token');
@@ -369,7 +380,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
 
     try {
       setSubmitLoading(true);
-      const transactionDateIso = getAppDate().toISOString();
+      const transactionDateIso = getTransactionDateIso();
 
       const headers = authHeaders();
       headers.set('Content-Type', 'application/json');
@@ -393,32 +404,72 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
           return;
         }
 
-        // Cash → account: single INCOME transaction on destination (no debit card to deduct from)
+        // Cash → account: create paired EXPENSE (cash) + INCOME (destination) with shared transfer_id
         if (cardId === 'cash') {
-          const cashPayload = {
+          const transferId = crypto.randomUUID();
+          const transferDesc = desc || 'Cash Transfer';
+
+          const outgoingPayload = {
+            type: 'expense',
+            amount: amountNum,
+            category: 'Transfer',
+            description: transferDesc,
+            ...(transactionDateIso ? { date: transactionDateIso } : {}),
+            transfer_id: transferId,
+            paymentMethod: 'cash',
+            metadata: {
+              category_name: 'Transfer',
+              paymentMethod: 'cash',
+              payment_method: 'cash',
+              transferRole: 'outgoing',
+              fromCardId: 'cash',
+              toCardId,
+            },
+          };
+
+          const incomingPayload = {
             type: 'income',
             amount: amountNum,
             category: 'Transfer',
-            description: desc || 'Cash Transfer',
-            date: transactionDateIso,
+            description: transferDesc,
+            ...(transactionDateIso ? { date: transactionDateIso } : {}),
             card_id: toCardId,
-            paymentMethod: 'cash',
-            metadata: { category_name: 'Transfer', paymentMethod: 'cash', transferRole: 'incoming' },
+            transfer_id: transferId,
+            paymentMethod: 'debit',
+            metadata: {
+              category_name: 'Transfer',
+              paymentMethod: 'debit',
+              payment_method: 'debit',
+              transferRole: 'incoming',
+              fromCardId: 'cash',
+              toCardId,
+            },
           };
-          const res = await fetch(`${API_BASE}/api/transactions`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(cashPayload),
-          });
-          const data = await res.json().catch(() => null);
-          if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to create cash transfer');
+
+          const [outRes, inRes] = await Promise.all([
+            fetch(`${API_BASE}/api/transactions`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(outgoingPayload),
+            }),
+            fetch(`${API_BASE}/api/transactions`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(incomingPayload),
+            }),
+          ]);
+
+          const outData = await outRes.json().catch(() => null);
+          if (!outRes.ok) throw new Error(outData?.error || outData?.message || 'Failed to create cash transfer (outgoing)');
+          const inData = await inRes.json().catch(() => null);
+          if (!inRes.ok) throw new Error(inData?.error || inData?.message || 'Failed to create cash transfer (incoming)');
         } else {
           const transferPayload = {
             fromCardId: cardId,
             toCardId,
             amount: amountNum,
             description: desc || 'Transfer',
-            date: transactionDateIso,
+            ...(transactionDateIso ? { date: transactionDateIso } : {}),
           };
           const res = await fetch(`${API_BASE}/api/transfers`, {
             method: 'POST',
@@ -489,7 +540,7 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
         amount: amountNum,
         category: finalCategory,
         description: desc || finalCategory,
-        date: transactionDateIso,
+        ...(transactionDateIso ? { date: transactionDateIso } : {}),
         category_id:
           selectedCategory && selectedCategory.source === 'api' && !isOtherCategory ? selectedCategory.id : null,
         card_id: paymentMethod === 'cash' ? null : cardId || null,

@@ -36,7 +36,8 @@ export type UiTransaction = {
 
 export function toUiTransaction(t: ApiTransaction): UiTransaction {
   const iso = t.occurred_at || t.created_at || t.date || new Date().toISOString();
-  const dateOnly = new Date(iso).toISOString().split('T')[0];
+  const d = new Date(iso);
+  const dateOnly = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
   const rawType = String(t.type || '').toUpperCase();
   const uiType: 'income' | 'expense' = rawType === 'INCOME' ? 'income' : 'expense';

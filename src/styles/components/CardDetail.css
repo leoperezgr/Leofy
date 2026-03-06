@@ -1,7 +1,13 @@
+/* ── Page Background ── */
 .cd-page {
   margin: 0 auto;
   max-width: 80rem;
   padding: 1rem;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 20%, rgba(45, 212, 191, 0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 90% 80%, rgba(59, 130, 246, 0.05) 0%, transparent 60%),
+    var(--background, #f8fafc);
 }
 
 .cd-header,
@@ -20,12 +26,17 @@
   color: #64748b;
 }
 
+/* ── Glass Base ── */
 .cd-error-box,
 .cd-box {
-  border: 1px solid #f3f4f6;
-  border-radius: 1rem;
-  background: #fff;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 1.25rem;
+  box-shadow:
+    0 4px 24px rgba(15, 23, 42, 0.06),
+    0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
 .cd-error-box {
@@ -106,14 +117,19 @@
   color: #14b8a6;
 }
 
+/* ── Card Visual — Premium ── */
 .cd-card-visual {
   position: relative;
   margin-bottom: 1.5rem;
   height: 12rem;
   overflow: hidden;
-  border-radius: 1rem;
+  border-radius: 1.25rem;
   padding: 1.5rem;
-  box-shadow: 0 12px 24px rgb(15 23 42 / 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 12px 24px rgba(15, 23, 42, 0.18),
+    0 4px 8px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
   background-image: linear-gradient(to bottom right, var(--tw-gradient-from), var(--tw-gradient-to));
 }
 
@@ -126,17 +142,19 @@
 .cd-card-orb-large {
   right: -2rem;
   top: -2rem;
-  height: 10rem;
-  width: 10rem;
-  background: rgb(255 255 255 / 0.1);
+  height: 12rem;
+  width: 12rem;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.02) 70%);
+  filter: blur(2px);
 }
 
 .cd-card-orb-small {
   right: -1rem;
   top: 4rem;
-  height: 8rem;
-  width: 8rem;
-  background: rgb(255 255 255 / 0.05);
+  height: 9rem;
+  width: 9rem;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 70%);
+  filter: blur(2px);
 }
 
 .cd-card-content {
@@ -153,17 +171,21 @@
   margin-bottom: 0.25rem;
   opacity: 0.8;
   font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .cd-card-name {
   font-size: 1.5rem;
   font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .cd-card-last4 {
   font-size: 1.875rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .cd-box {
@@ -221,11 +243,14 @@
   line-height: 1.4;
 }
 
+/* ── Usage Stats ── */
 .cd-label,
 .cd-usage-label {
   margin-bottom: 0.5rem;
   color: #64748b;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .cd-usage-label {
@@ -237,6 +262,7 @@
   color: #1f2933;
   font-size: 1.875rem;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .cd-stat-value-green {
@@ -275,11 +301,12 @@
   color: #facc15;
 }
 
+/* ── Usage Bar ── */
 .cd-usage-track {
-  height: 0.75rem;
+  height: 0.5rem;
   overflow: hidden;
   border-radius: 9999px;
-  background: #f3f4f6;
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .cd-usage-fill {
@@ -289,21 +316,24 @@
 }
 
 .cd-usage-fill-high {
-  background: #facc15;
+  background: linear-gradient(90deg, #facc15, #f59e0b);
 }
 
 .cd-usage-fill-normal {
-  background: #3b82f6;
+  background: linear-gradient(90deg, #2dd4bf, #3b82f6);
 }
 
+/* ── Warning Box — Frosted Glass ── */
 .cd-warning-box {
   margin-top: 1.5rem;
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  border: 1px solid #fef3c7;
+  background: rgba(254, 252, 232, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(250, 204, 21, 0.25);
   border-radius: 0.75rem;
-  background: #fefce8;
   padding: 1rem;
 }
 
@@ -326,27 +356,37 @@
   font-size: 0.875rem;
 }
 
+/* ── Section Title ── */
 .cd-section-title {
   margin-bottom: 1rem;
   color: #1f2933;
   font-size: 1.125rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
+/* ── Transaction List ── */
 .cd-transactions-list {
   display: grid;
   gap: 0.75rem;
 }
 
 .cd-transaction-item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 0;
+  padding: 0.75rem 0.5rem;
+  border-radius: 0.75rem;
+  transition: background-color 180ms ease;
+}
+
+.cd-transaction-item:hover {
+  background: rgba(45, 212, 191, 0.04);
 }
 
 .cd-transaction-item-divider {
-  border-bottom: 1px solid #f9fafb;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .cd-transaction-left {
@@ -364,13 +404,14 @@
   align-items: center;
   justify-content: center;
   border-radius: 0.75rem;
-  background: #f9fafb;
+  background: rgba(45, 212, 191, 0.08);
+  border: 1px solid rgba(45, 212, 191, 0.12);
 }
 
 .cd-transaction-icon {
   height: 1.5rem;
   width: 1.5rem;
-  color: #64748b;
+  color: var(--primary, #2dd4bf);
 }
 
 .cd-transaction-main {
@@ -403,11 +444,12 @@
   display: inline-flex;
   align-items: center;
   border-radius: 9999px;
-  background: #ecfeff;
+  background: rgba(45, 212, 191, 0.1);
+  border: 1px solid rgba(45, 212, 191, 0.2);
   padding: 0.2rem 0.55rem;
   color: #0f766e;
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .cd-installment-info {
@@ -418,6 +460,9 @@
 
 .cd-transaction-right {
   text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 .cd-transaction-amount {
@@ -426,9 +471,65 @@
   font-weight: 600;
 }
 
+.cd-transaction-amount-income {
+  color: #10b981;
+}
+
 .cd-transaction-date {
   color: #94a3b8;
   font-size: 0.75rem;
+}
+
+.cd-row-selected {
+  background: rgba(45, 212, 191, 0.08);
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 8px rgba(45, 212, 191, 0.1);
+}
+
+.cd-edit-link-desktop {
+  display: none;
+}
+
+.cd-edit-icon {
+  height: 1rem;
+  width: 1rem;
+  color: #64748b;
+}
+
+.cd-mobile-actions {
+  margin-top: 0.5rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cd-mobile-edit-grid {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid #99f6e4;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  color: #0f766e;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.cd-row-selected .cd-mobile-edit-grid {
+  background: #ccfbf1;
+  border-color: #2dd4bf;
+  box-shadow: 0 8px 18px rgb(20 184 166 / 0.2);
+}
+
+.cd-mobile-edit-grid:active {
+  transform: scale(0.97);
+}
+
+.cd-mobile-grid-icon {
+  height: 0.9rem;
+  width: 0.9rem;
 }
 
 .cd-bottom-actions {
@@ -487,5 +588,34 @@
   .cd-cycle-stats-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .cd-edit-link-desktop {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    opacity: 0;
+    transition: opacity 150ms ease, background-color 150ms ease;
+  }
+
+  .cd-transaction-item:hover .cd-edit-link-desktop {
+    opacity: 1;
+  }
+
+  .cd-edit-link-desktop:hover {
+    background: rgba(255, 255, 255, 0.85);
+  }
+
+  .cd-mobile-actions {
+    display: none;
   }
 }

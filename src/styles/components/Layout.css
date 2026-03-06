@@ -11,6 +11,17 @@
   flex-direction: column;
   border-right: 1px solid #e5e7eb;
   background: #fff;
+  transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  overflow: visible;
+  z-index: 40;
+}
+
+.layout-sidebar--collapsed {
+  width: 4.5rem;
 }
 
 .layout-sidebar-header {
@@ -43,11 +54,30 @@
   color: #1f2933;
   font-size: 1.5rem;
   font-weight: 600;
+  transition: opacity 200ms, width 200ms;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.layout-sidebar--collapsed .layout-sidebar-header {
+  padding: 1.5rem 0.5rem;
+}
+
+.layout-sidebar--collapsed .layout-brand {
+  justify-content: center;
+  gap: 0;
+}
+
+.layout-sidebar--collapsed .layout-brand-name {
+  opacity: 0;
+  width: 0;
 }
 
 .layout-nav {
   flex: 1;
   padding: 0 1rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .layout-nav-link {
@@ -84,10 +114,50 @@
 .layout-nav-label,
 .layout-add-btn-text {
   font-weight: 500;
+  transition: opacity 200ms, width 200ms;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.layout-sidebar--collapsed .layout-nav-label,
+.layout-sidebar--collapsed .layout-add-btn-text {
+  opacity: 0;
+  width: 0;
+}
+
+.layout-sidebar--collapsed .layout-nav {
+  align-items: center;
+  padding: 0 0.5rem;
+}
+
+.layout-sidebar--collapsed .layout-nav-link {
+  justify-content: center;
+  padding: 0.75rem;
+  position: relative;
+}
+
+.layout-sidebar--collapsed .layout-sidebar-footer {
+  align-items: center;
+  padding: 0.5rem;
+}
+
+.layout-sidebar--collapsed .layout-add-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 9999px;
+  padding: 0;
+  gap: 0;
+}
+
+.layout-sidebar-footer {
+  margin-top: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .layout-add-btn {
-  margin-top: 1rem;
   display: flex;
   width: 100%;
   align-items: center;
@@ -98,7 +168,7 @@
   background: #2dd4bf;
   padding: 0.75rem 1rem;
   color: #fff;
-  transition: background-color 150ms ease;
+  transition: background-color 150ms ease, width 300ms cubic-bezier(0.4, 0, 0.2, 1), height 300ms cubic-bezier(0.4, 0, 0.2, 1), border-radius 300ms cubic-bezier(0.4, 0, 0.2, 1), padding 300ms cubic-bezier(0.4, 0, 0.2, 1), gap 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .layout-add-btn:hover,
@@ -111,10 +181,68 @@
   width: 1.25rem;
 }
 
+/* Sidebar toggle button */
+.layout-sidebar-toggle {
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  border-radius: 0.75rem;
+  transition: color 150ms, background 150ms;
+}
+
+.layout-sidebar-toggle:hover {
+  color: #2dd4bf;
+  background: #f8fafc;
+}
+
+.layout-sidebar-toggle-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.layout-sidebar--collapsed .layout-sidebar-toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* Tooltips */
+.layout-nav-tooltip {
+  position: absolute;
+  left: 100%;
+  margin-left: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  background: #1f2933;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 150ms, transform 150ms;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+}
+
+.layout-sidebar:not(.layout-sidebar--collapsed) .layout-nav-tooltip {
+  display: none;
+}
+
+.layout-sidebar--collapsed .layout-nav-link:hover .layout-nav-tooltip {
+  opacity: 1;
+  transform: translateX(0);
+}
+
 .layout-main {
   flex: 1;
   overflow: auto;
-  padding-bottom: 5rem;
+  padding-bottom: 6rem;
 }
 
 .layout-mobile-nav {
@@ -140,7 +268,9 @@
   align-items: center;
   gap: 0.25rem;
   border-radius: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.375rem;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
   transition: color 150ms ease;
 }
 
@@ -158,14 +288,19 @@
 }
 
 .layout-mobile-label {
-  font-size: 0.75rem;
+  font-size: 0.625rem;
+  max-width: 4rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
 }
 
 .layout-mobile-fab {
   position: fixed;
   right: 1rem;
-  bottom: 5rem;
-  z-index: 40;
+  bottom: 5.5rem;
+  z-index: 50;
   display: flex;
   height: 3.5rem;
   width: 3.5rem;
@@ -195,6 +330,12 @@
 
   .layout-main {
     padding-bottom: 0;
+    margin-left: 16rem;
+    transition: margin-left 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .layout-sidebar--collapsed ~ .layout-main {
+    margin-left: 4.5rem;
   }
 
   .layout-mobile-nav,

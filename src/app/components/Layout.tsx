@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Receipt, CreditCard, Wallet, BarChart3, Settings, Plus, FlaskConical, X } from 'lucide-react';
+import { Home, Receipt, CreditCard, Wallet, BarChart3, Settings, Plus, FlaskConical, X, ChevronsLeft } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AddTransactionModal } from './AddTransactionModal';
 import { useAppDate } from '../contexts/AppDateContext';
@@ -9,6 +9,7 @@ export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [showAddTransaction, setShowAddTransaction] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const { isOverrideActive, dateOverride, setDateOverride } = useAppDate();
 
   const isTester = useMemo(() => {
@@ -50,7 +51,7 @@ export function Layout() {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const navItems = [
+  const sidebarNavItems = [
     { path: '/', icon: Home, label: 'Home' },
     { path: '/transactions', icon: Receipt, label: 'Transactions' },
     { path: '/cards', icon: CreditCard, label: 'Credit Cards' },
@@ -60,10 +61,19 @@ export function Layout() {
     ...(isTester ? [{ path: '/tester', icon: FlaskConical, label: 'Tester' }] : []),
   ];
 
+  const mobileNavItems = [
+    { path: '/', icon: Home, label: 'Home' },
+    { path: '/transactions', icon: Receipt, label: 'Txns' },
+    { path: '/cards', icon: CreditCard, label: 'Cards' },
+    { path: '/statistics', icon: BarChart3, label: 'Stats' },
+    { path: '/settings', icon: Settings, label: 'Settings' },
+    ...(isTester ? [{ path: '/tester', icon: FlaskConical, label: 'Tester' }] : []),
+  ];
+
   return (
     <div className="layout-root">
       {/* Desktop Sidebar */}
-      <aside className="layout-sidebar">
+      <aside className={`layout-sidebar ${collapsed ? 'layout-sidebar--collapsed' : ''}`}>
         <div className="layout-sidebar-header">
           <div className="layout-brand">
             <div className="layout-brand-badge">
@@ -74,7 +84,7 @@ export function Layout() {
         </div>
 
         <nav className="layout-nav">
-          {navItems.map((item) => {
+          {sidebarNavItems.map((item) => {
             const Icon = item.icon;
             return (
               <Link
@@ -88,11 +98,14 @@ export function Layout() {
               >
                 <Icon className="layout-nav-icon" />
                 <span className="layout-nav-label">{item.label}</span>
+                <span className="layout-nav-tooltip">{item.label}</span>
               </Link>
             );
           })}
 
-          {/* Add Transaction Button debajo de los nav items */}
+        </nav>
+
+        <div className="layout-sidebar-footer">
           <button
             onClick={() => setShowAddTransaction(true)}
             className="layout-add-btn"
@@ -100,9 +113,14 @@ export function Layout() {
             <Plus className="layout-add-btn-icon" />
             <span className="layout-add-btn-text">Add Transaction</span>
           </button>
-        </nav>
 
-        
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            className="layout-sidebar-toggle"
+          >
+            <ChevronsLeft className="layout-sidebar-toggle-icon" />
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -123,14 +141,17 @@ export function Layout() {
       {/* Mobile Bottom Navigation */}
       <nav className="layout-mobile-nav">
         <div className="layout-mobile-nav-inner">
-          {navItems.map((item) => {
+          {mobileNavItems.map((item) => {
             const Icon = item.icon;
+            const active = item.path === '/cards'
+              ? location.pathname === '/cards' || location.pathname === '/debit-cards'
+              : isActive(item.path);
             return (
               <Link
                 key={item.path}
                 to={item.path}
                 className={`layout-mobile-link ${
-                  isActive(item.path)
+                  active
                     ? 'layout-mobile-link-active'
                     : 'layout-mobile-link-inactive'
                 }`}
@@ -144,12 +165,14 @@ export function Layout() {
       </nav>
 
       {/* Floating Action Button - Mobile */}
-      <button
-        onClick={() => setShowAddTransaction(true)}
-        className="layout-mobile-fab"
-      >
-        <Plus className="layout-mobile-fab-icon" />
-      </button>
+      {!showAddTransaction && (
+        <button
+          onClick={() => setShowAddTransaction(true)}
+          className="layout-mobile-fab"
+        >
+          <Plus className="layout-mobile-fab-icon" />
+        </button>
+      )}
 
       {/* Add Transaction Modal */}
       <AddTransactionModal

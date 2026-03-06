@@ -59,12 +59,13 @@ Leofy/
 │   │   │   └── AppDateContext.tsx  # Global date override for testing
 │   │   ├── components/
 │   │   │   ├── Layout.tsx         # Sidebar + mobile nav + date override banner
-│   │   │   ├── Dashboard.tsx      # Home: container with Overview + Net Available tabs
+│   │   │   ├── Dashboard.tsx      # Home: container with Overview, Net Available & Safe to Spend tabs
 │   │   │   ├── DashboardOverview.tsx  # Overview tab: period charts, recent transactions
 │   │   │   ├── DashboardNetAvailable.tsx # Net Available tab: debit minus credit due
+│   │   │   ├── DashboardSafeToSpend.tsx  # Safe to Spend tab: net available minus current cycle charges
 │   │   │   ├── Login.tsx          # Email/password login
 │   │   │   ├── Onboarding.tsx     # First-time setup flow
-│   │   │   ├── Transactions.tsx   # Transaction list with filters
+│   │   │   ├── Transactions.tsx   # Transaction list with filters, premium fintech design
 │   │   │   ├── TransactionDetail.tsx  # Edit single transaction
 │   │   │   ├── TransferDetail.tsx # View/edit individual transfers
 │   │   │   ├── AddTransactionModal.tsx # Create income/expense/transfer
@@ -85,6 +86,7 @@ Leofy/
 │   │   │       ├── button.tsx, card.tsx, dialog.tsx, tabs.tsx, ...
 │   │   │       └── utils.ts      # cn() utility (clsx + tailwind-merge)
 │   │   └── utils/
+│   │       ├── creditCycleCalculator.ts # Credit card cycle math, installments, three-cycle breakdown
 │   │       ├── formatMoney.ts     # Number → "1,234.50"
 │   │       ├── transactionsMapper.ts  # Normalize API → UI transaction shape
 │   │       ├── cardOrder.ts       # localStorage card ordering
@@ -206,16 +208,23 @@ Transfer rules: Only from debit accounts. Creates 2 linked transactions (EXPENSE
 ## Key Business Logic
 
 ### Credit Card Billing Cycles
+- All cycle logic lives in `src/app/utils/creditCycleCalculator.ts`
 - Each card has `closing_day` (statement close) and `due_day` (payment due)
 - **Active cycle**: from (previous closing day + 1) to (next closing day)
-- `getNextMonthlyDate(dayOfMonth, refDate)`: returns next occurrence of a day (this month if not passed, otherwise next month)
-- `getCurrentCycleInfo(card, today)`: returns cycleStart, cycleEnd, dueDate, daysUntilDue
+- `getCurrentCycleInfo(card, refDate)`: returns cycleStart, cycleEnd, dueDate, cutoffDate, source, isWithinPaymentWindow
+- `getThreeCycleRanges(card, refDate)`: returns pastCycle, currentCycle, nextCycle ranges + dueDate
+- `computeThreeCycleAmounts(card, transactions, refDate)`: full breakdown of amounts per cycle (due, paid, remaining)
+- `computeCycleExpenseDue()` / `computeCyclePaymentTotal()`: per-card expense and payment totals within a cycle
+- `isLikelyCreditCardPayment(tx)`: heuristic to detect credit card payment transactions (excluded from cycle due calculations)
+- Helper types exported: `ApiTx`, `ApiCard`, `CycleRange`, `CurrentCycleInfo`, `CreditDueCardItem`, `ThreeCycleAmounts`, `InstallmentsInfo`
 - Dashboard shows: estimated due, already paid, progress bar, overdue status
 
 ### Installments (MSI)
 - Stored in `metadata.installments`: `{ months, monthlyAmount, startAt }`
+- `getInstallmentsInfo(tx, refDate, closingDay?)`: calculates currentMonth, remainingMonths, monthlyAmount
+- `getInstallmentCycleEnd(startAt, closingDay)`: determines which billing cycle the first installment falls into
 - Dashboard counts which month the user is in based on `startAt`
-- Transactions list shows "X of Y months paid"
+- Transactions list shows MSI chip with visual progress bar
 
 ### Transfers
 - Creates paired EXPENSE + INCOME transactions linked by `transfer_id` (UUID)
@@ -223,6 +232,14 @@ Transfer rules: Only from debit accounts. Creates 2 linked transactions (EXPENSE
 - Supports full CRUD: create, read, update, and delete
 - When "From Cash" selected in modal, posts directly to `/api/transactions` as INCOME on destination card (bypasses `/api/transfers` which requires numeric `fromCardId`)
 - TransferDetail component at route `/transactions/transfers/:transferId` for viewing/editing individual transfers
+
+### Safe to Spend
+- Third Dashboard tab: calculates how much the user can safely spend
+- Formula: `safeToSpend = totalDebitAvailable - totalPastCycleRemaining - totalCurrentCycleAmount`
+- `totalDebitAvailable`: sum of all debit account balances (INCOME - EXPENSE per debit card)
+- `totalPastCycleRemaining`: sum of past cycle remaining amounts across all credit cards (from `computeThreeCycleAmounts`)
+- `totalCurrentCycleAmount`: sum of current cycle remaining amounts across all credit cards (from `computeThreeCycleAmounts`)
+- Shows per-card breakdown with cycle progress, last statement remaining, and total balance
 
 ### Payment Methods
 - `cash`: no card association
@@ -255,6 +272,22 @@ Transfer rules: Only from debit accounts. Creates 2 linked transactions (EXPENSE
 
 ### Card Color Gradients
 RED, ORANGE, BLUE, GOLD, BLACK, PLATINUM, SILVER, PURPLE, GREEN, OTHER (default teal)
+
+### Transactions Page Design
+- **Premium fintech aesthetic** (Revolut/Copilot/Monarch style)
+- **Row hierarchy**: Category as primary text (600 weight), description as muted secondary, amounts as display font (800 weight, 1.25rem mobile / 1.375rem desktop)
+- **Type differentiation**: Colored left border per row — income (#10B981), expense (#EF4444), transfer (#3B82F6), credit payment (#8B5CF6)
+- **Icon wraps**: 2.5rem with semi-transparent colored backgrounds matching type
+- **Payment badges**: Pill badges showing Cash/Debit/Credit method per transaction
+- **Card name badges**: Color-coded by card color enum (`tx-card-badge--RED`, `--BLUE`, etc.)
+- **Filter tabs**: Pill-style with teal active state, not underline tabs
+- **Staggered animation**: Rows fade-in with incremental delay (30ms per item)
+- **Sticky date headers**: Uppercase, backdrop-blur, `width: fit-content`
+- **Installments**: MSI chip + visual progress bar + remaining info
+- **Transfers**: Dedicated badge + arrow between card names
+- **Empty descriptions**: Hidden (not rendered) when falsy or "-"
+- **UiTransactionRow** includes `cardColor?: string` mapped from card's `color` field
+- **Long-press**: Premium sheen animation + float effect for mobile edit
 
 ### CSS Approach
 - Component-specific CSS files in `src/styles/components/` matching component name

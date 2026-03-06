@@ -526,10 +526,12 @@ export function Dashboard() {
 
       let cycleProgressPercent = 0;
       let cycleLabel = 'N/A';
+      let cycleDayElapsed = 0;
+      let cycleDayTotal = 0;
       if (ranges.currentCycle) {
-        const totalDays = daysDiff(ranges.currentCycle.start, ranges.currentCycle.end);
-        const elapsed = daysDiff(ranges.currentCycle.start, today);
-        cycleProgressPercent = totalDays > 0 ? Math.min(Math.max((elapsed / totalDays) * 100, 0), 100) : 0;
+        cycleDayTotal = daysDiff(ranges.currentCycle.start, ranges.currentCycle.end);
+        cycleDayElapsed = daysDiff(ranges.currentCycle.start, today);
+        cycleProgressPercent = cycleDayTotal > 0 ? Math.min(Math.max((cycleDayElapsed / cycleDayTotal) * 100, 0), 100) : 0;
         cycleLabel = ranges.currentCycle.label;
       }
 
@@ -543,6 +545,8 @@ export function Dashboard() {
         lastStatementRemaining,
         currentCycleAmount: currentCycleAmt,
         cycleProgressPercent,
+        cycleDayElapsed,
+        cycleDayTotal,
         cycleLabel,
         totalCardBalance: lastStatementRemaining + currentCycleAmt,
       };
@@ -558,9 +562,8 @@ export function Dashboard() {
   const safeToSpend = totalDebitAvailable - totalPastCycleRemaining - totalCurrentCycleAmount;
 
   const todayLabel = getAppDate().toLocaleDateString('en-US', {
-    weekday: 'long',
-    day: 'numeric',
     month: 'long',
+    day: 'numeric',
     year: 'numeric',
   });
 
@@ -574,54 +577,32 @@ export function Dashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 lg:p-8">
+    <div className="db-root">
       {/* Header */}
-      <div className="dashboard-header mb-8">
-        <div>
-          <h1 className="text-3xl font-semibold text-[#1F2933] mb-2">
-            {userName ? `Welcome, ${userName}` : 'Welcome'}
-          </h1>
-          <p className="text-[#64748B]">Today is {todayLabel}</p>
-        </div>
-        <div className="dashboard-header-badges">
-          <span className="dashboard-badge">{getPeriodLabel(period)}</span>
-        </div>
+      <div className="db-header">
+        <h1 className="db-header-title">
+          {userName ? `Welcome back, ${userName.split(' ')[0]}` : 'Welcome back'}
+        </h1>
+        <p className="db-header-date">{todayLabel}</p>
       </div>
-      <div className="mb-6 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setActiveTab('overview')}
-          className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-            activeTab === 'overview'
-              ? 'bg-[#2DD4BF] text-white shadow-sm'
-              : 'bg-white text-[#64748B] border border-gray-200'
-          }`}
-        >
-          Overview
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('net')}
-          className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-            activeTab === 'net'
-              ? 'bg-[#2DD4BF] text-white shadow-sm'
-              : 'bg-white text-[#64748B] border border-gray-200'
-          }`}
-        >
-          Net Available
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('safe')}
-          className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-            activeTab === 'safe'
-              ? 'bg-[#2DD4BF] text-white shadow-sm'
-              : 'bg-white text-[#64748B] border border-gray-200'
-          }`}
-        >
-          Safe to Spend
-        </button>
-      </div>
+
+      {/* Tab switcher */}
+      <nav className="db-tabs">
+        {([
+          { key: 'overview', label: 'Overview' },
+          { key: 'net', label: 'Net Available' },
+          { key: 'safe', label: 'Safe to Spend' },
+        ] as const).map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={`db-tab ${activeTab === tab.key ? 'db-tab--active' : ''}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
 
       {activeTab === 'overview' && (
         <DashboardOverview
@@ -663,6 +644,7 @@ export function Dashboard() {
           netAvailable={netAvailable}
           totalCurrentCycleAmount={totalCurrentCycleAmount}
           cardItems={creditCardItems}
+          onGoToNetAvailable={() => setActiveTab('net')}
         />
       )}
     </div>

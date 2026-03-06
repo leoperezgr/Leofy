@@ -40,6 +40,7 @@ const createSchema = z.object({
   occurred_at: z.string().datetime().optional(),
   card_id: z.string().regex(/^\d+$/).optional().nullable(),
   category_id: z.string().regex(/^\d+$/).optional().nullable(),
+  transfer_id: z.string().uuid().optional().nullable(),
   paymentMethod: paymentMethodSchema.optional(),
   metadata: metadataSchema.optional(),
 });
@@ -173,6 +174,7 @@ transactionsRouter.post("/", async (req, res) => {
       occurred_at: occurredAt,
       card_id: parsed.data.card_id ? BigInt(parsed.data.card_id) : null,
       category_id: parsed.data.category_id ? BigInt(parsed.data.category_id) : null,
+      transfer_id: parsed.data.transfer_id || null,
       metadata,
     },
   });
