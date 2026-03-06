@@ -454,8 +454,53 @@ export function Transactions() {
           });
         }
 
+        // Fallback: detect legacy cash transfers without transfer_id
+        // These are single INCOME transactions with transferRole=incoming and no transfer_id
+        const legacyTransferRows: TransferListRow[] = [];
+        for (const row of rawList) {
+          if (!row?.id) continue;
+          const txId = String(row.id);
+          if (consumedIds.has(txId)) continue;
+
+          const transferIdVal = String(row?.transfer_id ?? row?.transferId ?? "").trim();
+          if (transferIdVal) continue; // already handled above
+
+          const meta = row?.metadata;
+          if (!meta || typeof meta !== "object") continue;
+
+          const transferRole = String(meta.transferRole || "").toLowerCase();
+          const catName = String(meta.category_name || row?.category || "").toLowerCase();
+
+          if (transferRole !== "incoming" || catName !== "transfer") continue;
+
+          const normalized = normalizedById.get(txId);
+          if (!normalized) continue;
+
+          consumedIds.add(txId);
+
+          const toId = String(meta.toCardId || row?.card_id || row?.cardId || "").trim();
+          const fromId = String(meta.fromCardId || "").trim();
+          const toCardIsCredit = Boolean(cardIsCreditById.get(toId));
+
+          legacyTransferRows.push({
+            kind: "transfer",
+            id: txId,
+            transferId: `legacy-${txId}`,
+            amount: normalized.amount,
+            description: normalized.description || "Cash Transfer",
+            category: "Transfer",
+            date: normalized.date || dateToDay(row?.occurred_at),
+            fromCardId: fromId || "cash",
+            toCardId: toId,
+            fromCardName: fromId ? (cardNameById.get(fromId) || "Unknown") : "Cash",
+            toCardName: cardNameById.get(toId) || "Unknown account",
+            toCardIsCredit,
+            section: toCardIsCredit ? "credit_payment" : "all",
+          });
+        }
+
         const nonTransferRows = normalizedTransactions.filter((row) => !consumedIds.has(String(row.id)));
-        const nextItems: ListRow[] = [...nonTransferRows, ...transferRows];
+        const nextItems: ListRow[] = [...nonTransferRows, ...transferRows, ...legacyTransferRows];
 
         if (!cancelled) setItems(nextItems);
       } catch (e) {

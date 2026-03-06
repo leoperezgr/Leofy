@@ -404,25 +404,65 @@ export function AddTransactionModal({ open, onClose }: AddTransactionModalProps)
           return;
         }
 
-        // Cash → account: single INCOME transaction on destination (no debit card to deduct from)
+        // Cash → account: create paired EXPENSE (cash) + INCOME (destination) with shared transfer_id
         if (cardId === 'cash') {
-          const cashPayload = {
+          const transferId = crypto.randomUUID();
+          const transferDesc = desc || 'Cash Transfer';
+
+          const outgoingPayload = {
+            type: 'expense',
+            amount: amountNum,
+            category: 'Transfer',
+            description: transferDesc,
+            ...(transactionDateIso ? { date: transactionDateIso } : {}),
+            transfer_id: transferId,
+            paymentMethod: 'cash',
+            metadata: {
+              category_name: 'Transfer',
+              paymentMethod: 'cash',
+              payment_method: 'cash',
+              transferRole: 'outgoing',
+              fromCardId: 'cash',
+              toCardId,
+            },
+          };
+
+          const incomingPayload = {
             type: 'income',
             amount: amountNum,
             category: 'Transfer',
-            description: desc || 'Cash Transfer',
+            description: transferDesc,
             ...(transactionDateIso ? { date: transactionDateIso } : {}),
             card_id: toCardId,
-            paymentMethod: 'cash',
-            metadata: { category_name: 'Transfer', paymentMethod: 'cash', transferRole: 'incoming' },
+            transfer_id: transferId,
+            paymentMethod: 'debit',
+            metadata: {
+              category_name: 'Transfer',
+              paymentMethod: 'debit',
+              payment_method: 'debit',
+              transferRole: 'incoming',
+              fromCardId: 'cash',
+              toCardId,
+            },
           };
-          const res = await fetch(`${API_BASE}/api/transactions`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(cashPayload),
-          });
-          const data = await res.json().catch(() => null);
-          if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to create cash transfer');
+
+          const [outRes, inRes] = await Promise.all([
+            fetch(`${API_BASE}/api/transactions`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(outgoingPayload),
+            }),
+            fetch(`${API_BASE}/api/transactions`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(incomingPayload),
+            }),
+          ]);
+
+          const outData = await outRes.json().catch(() => null);
+          if (!outRes.ok) throw new Error(outData?.error || outData?.message || 'Failed to create cash transfer (outgoing)');
+          const inData = await inRes.json().catch(() => null);
+          if (!inRes.ok) throw new Error(inData?.error || inData?.message || 'Failed to create cash transfer (incoming)');
         } else {
           const transferPayload = {
             fromCardId: cardId,
