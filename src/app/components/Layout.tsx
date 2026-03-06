@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Receipt, CreditCard, Wallet, BarChart3, Settings, Plus, FlaskConical, X } from 'lucide-react';
+import { Home, Receipt, CreditCard, Wallet, BarChart3, Settings, Plus, FlaskConical, X, ChevronsLeft } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AddTransactionModal } from './AddTransactionModal';
 import { useAppDate } from '../contexts/AppDateContext';
@@ -9,6 +9,7 @@ export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [showAddTransaction, setShowAddTransaction] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const { isOverrideActive, dateOverride, setDateOverride } = useAppDate();
 
   const isTester = useMemo(() => {
@@ -72,7 +73,7 @@ export function Layout() {
   return (
     <div className="layout-root">
       {/* Desktop Sidebar */}
-      <aside className="layout-sidebar">
+      <aside className={`layout-sidebar ${collapsed ? 'layout-sidebar--collapsed' : ''}`}>
         <div className="layout-sidebar-header">
           <div className="layout-brand">
             <div className="layout-brand-badge">
@@ -97,11 +98,14 @@ export function Layout() {
               >
                 <Icon className="layout-nav-icon" />
                 <span className="layout-nav-label">{item.label}</span>
+                <span className="layout-nav-tooltip">{item.label}</span>
               </Link>
             );
           })}
 
-          {/* Add Transaction Button debajo de los nav items */}
+        </nav>
+
+        <div className="layout-sidebar-footer">
           <button
             onClick={() => setShowAddTransaction(true)}
             className="layout-add-btn"
@@ -109,9 +113,14 @@ export function Layout() {
             <Plus className="layout-add-btn-icon" />
             <span className="layout-add-btn-text">Add Transaction</span>
           </button>
-        </nav>
 
-        
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            className="layout-sidebar-toggle"
+          >
+            <ChevronsLeft className="layout-sidebar-toggle-icon" />
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
